@@ -17,6 +17,7 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const paymentSettingsRoutes = require('./routes/paymentSettings.routes');
 const razorpayPaymentsRoutes = require('./routes/razorpayPayments.routes');
 const pettyCashRoutes = require('./routes/pettyCash.routes');
+const publicDonationsRoutes = require('./routes/publicDonations.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,8 +37,13 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/payments/razorpay', razorpayPaymentsRoutes);
 app.use('/api/petty-cash', pettyCashRoutes);
+app.use('/api/public/donations', publicDonationsRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+app.get('/donate', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'donate.html'));
+});
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));

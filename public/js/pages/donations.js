@@ -10,8 +10,8 @@ window.DonationsPage = {
       <div class="panel">
         <div class="panel-header"><h3>All Donations</h3><div class="text-muted" id="totalLabel"></div></div>
         <table>
-          <thead><tr><th>Date</th><th>Donor</th><th>Amount</th><th>Purpose</th><th>Event</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Donor</th><th>Amount</th><th>Purpose</th><th>Event</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="7">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -36,7 +36,7 @@ window.DonationsPage = {
     document.getElementById('totalLabel').textContent = `Total: ${Util.money(total)}`;
 
     if (!donations.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No donations recorded yet</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No donations recorded yet</td></tr>`;
       return;
     }
     tbody.innerHTML = donations
@@ -44,13 +44,15 @@ window.DonationsPage = {
         (d) => `
       <tr>
         <td>${d.donation_date}</td>
-        <td>${Util.escapeHtml(d.member_name || d.donor_name || '-')}</td>
+        <td>${Util.escapeHtml(d.member_name || d.donor_name || '-')}${d.donor_email || d.donor_phone ? `<br><span class="text-muted" style="font-size:0.78rem;">${Util.escapeHtml(d.donor_email || d.donor_phone)}</span>` : ''}</td>
         <td>${Util.money(d.amount)}</td>
         <td>${Util.escapeHtml(d.purpose || '-')}</td>
         <td>${Util.escapeHtml(d.event_title || '-')}</td>
+        <td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.status}</span></td>
         ${
           isAdmin
             ? `<td class="toolbar">
+                ${d.status === 'pending' ? `<button class="small" data-confirm="${d.id}">Confirm</button>` : ''}
                 <button class="small secondary" data-edit="${d.id}">Edit</button>
                 <button class="small danger" data-del="${d.id}">Delete</button>
               </td>`
@@ -61,6 +63,17 @@ window.DonationsPage = {
       .join('');
 
     if (isAdmin) {
+      tbody.querySelectorAll('[data-confirm]').forEach((btn) =>
+        btn.addEventListener('click', async () => {
+          if (!confirm('Confirm that this donation has been received (e.g. via UPI QR)?')) return;
+          try {
+            await Api.put(`/donations/${btn.dataset.confirm}/confirm`);
+            await this.loadRows();
+          } catch (err) {
+            this.showAlert(err.message);
+          }
+        })
+      );
       tbody.querySelectorAll('[data-edit]').forEach((btn) =>
         btn.addEventListener('click', () => {
           const d = donations.find((x) => String(x.id) === btn.dataset.edit);

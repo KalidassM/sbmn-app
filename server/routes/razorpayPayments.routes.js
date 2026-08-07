@@ -1,20 +1,9 @@
-const crypto = require('crypto');
 const express = require('express');
-const Razorpay = require('razorpay');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 
 const router = express.Router();
-
-function getGatewaySettings() {
-  return db.prepare('SELECT razorpay_key_id, razorpay_key_secret, payee_name FROM payment_settings WHERE id = 1').get();
-}
-
-function getRazorpayClient() {
-  const settings = getGatewaySettings();
-  if (!settings.razorpay_key_id || !settings.razorpay_key_secret) return null;
-  return new Razorpay({ key_id: settings.razorpay_key_id, key_secret: settings.razorpay_key_secret });
-}
 
 function loadDue(paymentId, user) {
   const due = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(paymentId);
@@ -90,12 +79,7 @@ router.post('/verify', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Order does not match this due' });
   }
 
-  const expectedSignature = crypto
-    .createHmac('sha256', settings.razorpay_key_secret)
-    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-    .digest('hex');
-
-  if (expectedSignature !== razorpay_signature) {
+  if (!verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, settings.razorpay_key_secret)) {
     return res.status(400).json({ error: 'Payment signature verification failed' });
   }
 

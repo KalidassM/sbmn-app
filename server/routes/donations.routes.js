@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 
 const router = express.Router();
 
@@ -56,6 +57,108 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Donation not found' });
   db.prepare('DELETE FROM donations WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// A logged-in member starts a donation for themselves; it stays 'pending' until paid online or confirmed by an admin (UPI QR path)
+router.post('/self', requireAuth, (req, res) => {
+  if (!req.user.member_id) {
+    return res.status(400).json({ error: 'Your login isn\'t linked to a member profile, so this can\'t be recorded as your own donation.' });
+  }
+  const { amount, purpose, event_id } = req.body || {};
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ error: 'A valid amount is required' });
+  }
+  const info = db
+    .prepare(
+      `INSERT INTO donations (member_id, amount, purpose, event_id, status, source)
+       VALUES (?, ?, ?, ?, 'pending', 'member')`
+    )
+    .run(req.user.member_id, amount, purpose || null, event_id || null);
+  const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(info.lastInsertRowid);
+  res.status(201).json(row);
+});
+
+function loadOwnDonation(donationId, user) {
+  const donation = db.prepare("SELECT * FROM donations WHERE id = ? AND source = 'member'").get(donationId);
+  if (!donation) return { error: 404, message: 'Donation not found' };
+  if (donation.member_id !== user.member_id) {
+    return { error: 403, message: 'You can only pay your own donation' };
+  }
+  if (donation.status !== 'pending') {
+    return { error: 400, message: 'This donation has already been completed' };
+  }
+  return { donation };
+}
+
+router.post('/self/:id/order', requireAuth, async (req, res) => {
+  const client = getRazorpayClient();
+  if (!client) {
+    return res.status(400).json({ error: 'Online payments are not configured yet. Ask an admin to set up Razorpay in Payment Settings.' });
+  }
+  const { donation, error, message } = loadOwnDonation(req.params.id, req.user);
+  if (error) return res.status(error).json({ error: message });
+
+  const amountPaise = Math.round(Number(donation.amount) * 100);
+  try {
+    const order = await client.orders.create({
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: `donation_${donation.id}`,
+      notes: { donation_id: String(donation.id), member_id: String(donation.member_id) },
+    });
+    db.prepare('UPDATE donations SET razorpay_order_id = ? WHERE id = ?').run(order.id, donation.id);
+    const settings = getGatewaySettings();
+    res.json({
+      orderId: order.id,
+      amount: amountPaise,
+      currency: order.currency,
+      keyId: settings.razorpay_key_id,
+      payeeName: settings.payee_name || 'Sri Balamurugan Nagar Welfare Association',
+    });
+  } catch (err) {
+    res.status(502).json({ error: 'Could not reach Razorpay to create the order. Check the API keys in Payment Settings.' });
+  }
+});
+
+router.post('/self/:id/verify', requireAuth, (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ error: 'Missing payment verification fields' });
+  }
+
+  const settings = getGatewaySettings();
+  if (!settings.razorpay_key_secret) {
+    return res.status(400).json({ error: 'Online payments are not configured' });
+  }
+
+  const { donation, error, message } = loadOwnDonation(req.params.id, req.user);
+  if (error) return res.status(error).json({ error: message });
+
+  if (donation.razorpay_order_id !== razorpay_order_id) {
+    return res.status(400).json({ error: 'Order does not match this donation' });
+  }
+  if (!verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, settings.razorpay_key_secret)) {
+    return res.status(400).json({ error: 'Payment signature verification failed' });
+  }
+
+  db.prepare(
+    `UPDATE donations SET status = 'completed', razorpay_payment_id = ?, donation_date = date('now') WHERE id = ?`
+  ).run(razorpay_payment_id, donation.id);
+
+  const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(donation.id);
+  res.json({ ok: true, donation: row });
+});
+
+// Admin reconciliation for donations paid via UPI QR (no automatic verification), whether from a member or a public well-wisher
+router.put('/:id/confirm', requireAuth, requireAdmin, (req, res) => {
+  const existing = db.prepare('SELECT * FROM donations WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Donation not found' });
+  if (existing.status !== 'pending') {
+    return res.status(400).json({ error: 'This donation is already completed' });
+  }
+  db.prepare("UPDATE donations SET status = 'completed', donation_date = date('now') WHERE id = ?").run(req.params.id);
+  const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(req.params.id);
+  res.json(row);
 });
 
 module.exports = router;

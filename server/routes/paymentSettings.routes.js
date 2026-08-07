@@ -1,7 +1,7 @@
 const express = require('express');
-const QRCode = require('qrcode');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { buildUpiQr } = require('../utils/upiQr');
 
 const router = express.Router();
 
@@ -42,30 +42,11 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
 
 // Builds a UPI deep link for the configured account and renders it as a scannable QR code
 router.get('/qr', requireAuth, async (req, res) => {
-  const settings = db.prepare('SELECT * FROM payment_settings WHERE id = 1').get();
-  if (!settings || !settings.upi_id) {
-    return res.status(400).json({ error: 'UPI ID has not been configured yet. Ask an admin to set it up in Payment Settings.' });
-  }
-  const amount = Number(req.query.amount);
-  if (!amount || amount <= 0) {
-    return res.status(400).json({ error: 'A valid amount is required' });
-  }
-  const note = (req.query.note || 'Association payment').toString().slice(0, 60);
-
-  const params = new URLSearchParams({
-    pa: settings.upi_id,
-    pn: settings.payee_name || 'Sri Balamurugan Nagar Welfare Association',
-    am: amount.toFixed(2),
-    cu: 'INR',
-    tn: note,
-  });
-  const upiUri = `upi://pay?${params.toString()}`;
-
   try {
-    const qrDataUrl = await QRCode.toDataURL(upiUri, { width: 260, margin: 1 });
-    res.json({ upiUri, qrDataUrl });
+    const result = await buildUpiQr(Number(req.query.amount), req.query.note);
+    res.json(result);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate QR code' });
+    res.status(400).json({ error: err.message });
   }
 });
 

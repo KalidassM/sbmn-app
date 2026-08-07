@@ -147,6 +147,27 @@ if (!expenseColumns.includes('source')) {
   db.exec("ALTER TABLE expenses ADD COLUMN source TEXT NOT NULL DEFAULT 'bank'");
 }
 
+// Migration: support self-service online donations (by members and by well-wishers with no account)
+const donationColumns = db.prepare('PRAGMA table_info(donations)').all().map((c) => c.name);
+if (!donationColumns.includes('status')) {
+  db.exec("ALTER TABLE donations ADD COLUMN status TEXT NOT NULL DEFAULT 'completed' CHECK(status IN ('pending','completed'))");
+}
+if (!donationColumns.includes('source')) {
+  db.exec("ALTER TABLE donations ADD COLUMN source TEXT NOT NULL DEFAULT 'admin' CHECK(source IN ('admin','member','public'))");
+}
+if (!donationColumns.includes('donor_email')) {
+  db.exec('ALTER TABLE donations ADD COLUMN donor_email TEXT');
+}
+if (!donationColumns.includes('donor_phone')) {
+  db.exec('ALTER TABLE donations ADD COLUMN donor_phone TEXT');
+}
+if (!donationColumns.includes('razorpay_order_id')) {
+  db.exec('ALTER TABLE donations ADD COLUMN razorpay_order_id TEXT');
+}
+if (!donationColumns.includes('razorpay_payment_id')) {
+  db.exec('ALTER TABLE donations ADD COLUMN razorpay_payment_id TEXT');
+}
+
 // Seed a default admin account on first run
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
 if (userCount === 0) {
