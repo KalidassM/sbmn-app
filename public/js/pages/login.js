@@ -17,7 +17,6 @@ window.LoginPage = {
             </div>
             <button type="submit" style="width:100%">Log in</button>
           </form>
-          <div class="auth-hint">First time here? Default admin login is <strong>admin / admin123</strong>. Please change the password after logging in.</div>
           <p class="text-muted" style="text-align:center;margin-top:16px;font-size:0.85rem;">Not a member? <a href="/donate">Donate as a well-wisher</a></p>
         </div>
       </div>
