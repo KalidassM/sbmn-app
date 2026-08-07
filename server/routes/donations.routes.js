@@ -116,6 +116,7 @@ router.post('/self/:id/order', requireAuth, async (req, res) => {
       payeeName: settings.payee_name || 'Sri Balamurugan Nagar Welfare Association',
     });
   } catch (err) {
+    console.error('Razorpay order creation failed (self donation):', err.error || err.message || err);
     res.status(502).json({ error: 'Could not reach Razorpay to create the order. Check the API keys in Payment Settings.' });
   }
 });
