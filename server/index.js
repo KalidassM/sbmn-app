@@ -18,12 +18,15 @@ const paymentSettingsRoutes = require('./routes/paymentSettings.routes');
 const razorpayPaymentsRoutes = require('./routes/razorpayPayments.routes');
 const pettyCashRoutes = require('./routes/pettyCash.routes');
 const publicDonationsRoutes = require('./routes/publicDonations.routes');
+const noticeRoutes = require('./routes/notices.routes');
+const contactMessageRoutes = require('./routes/contactMessages.routes');
+const publicSiteRoutes = require('./routes/publicSite.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' })); // raised to fit base64 committee-photo uploads
 
 app.use('/api/auth', authRoutes);
 app.use('/api/members', memberRoutes);
@@ -38,11 +41,19 @@ app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/payments/razorpay', razorpayPaymentsRoutes);
 app.use('/api/petty-cash', pettyCashRoutes);
 app.use('/api/public/donations', publicDonationsRoutes);
+app.use('/api/notices', noticeRoutes);
+app.use('/api/contact-messages', contactMessageRoutes);
+app.use('/api/public/site', publicSiteRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/donate', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'donate.html'));
+});
+
+// The member/admin portal (hash-routed SPA) lives at /portal; "/" is the public marketing site
+app.get('/portal', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'portal.html'));
 });
 
 app.get('*', (req, res) => {

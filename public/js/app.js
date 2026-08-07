@@ -47,6 +47,7 @@ const NAV_ITEMS = [
   { path: '#/events', label: 'Events' },
   { path: '#/core-members', label: 'Core Members' },
   { path: '#/donations', label: 'Donations' },
+  { path: '#/contact-messages', label: 'Contact Messages', adminOnly: true },
   { path: '#/users', label: 'Login Accounts', adminOnly: true },
   { path: '#/payment-settings', label: 'Payment Settings', adminOnly: true },
 ];
@@ -59,6 +60,7 @@ const PAGES = {
   '#/maintenance': window.MaintenancePage,
   '#/expenses': window.ExpensesPage,
   '#/donations': window.DonationsPage,
+  '#/contact-messages': window.ContactMessagesPage,
   '#/users': window.UsersPage,
   '#/payment-settings': window.PaymentSettingsPage,
 };
@@ -70,7 +72,7 @@ function renderShell() {
     <div class="shell">
       <aside class="sidebar">
         <h2>Sri Balamurugan Nagar Welfare Association</h2>
-        <div class="org-sub">Management Portal</div>
+        <div class="org-sub">Management Portal &middot; <a href="/" style="color:inherit;">Public Site</a></div>
         <nav id="nav"></nav>
         <div class="user-box">
           Signed in as <strong>${Util.escapeHtml(user.username)}</strong>

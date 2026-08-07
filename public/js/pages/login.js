@@ -4,7 +4,7 @@ window.LoginPage = {
       <div class="auth-wrap">
         <div class="auth-card">
           <h1>Sri Balamurugan Nagar Welfare Association</h1>
-          <p class="sub">Sign in to the management portal</p>
+          <p class="sub">Sign in to the management portal &middot; <a href="/">Back to homepage</a></p>
           <div id="loginAlert"></div>
           <form id="loginForm">
             <div class="field">

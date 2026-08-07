@@ -102,6 +102,24 @@ CREATE TABLE IF NOT EXISTS donations (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS notices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  house_no TEXT,
+  phone TEXT NOT NULL,
+  email TEXT,
+  message TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS payment_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   upi_id TEXT,
@@ -166,6 +184,12 @@ if (!donationColumns.includes('razorpay_order_id')) {
 }
 if (!donationColumns.includes('razorpay_payment_id')) {
   db.exec('ALTER TABLE donations ADD COLUMN razorpay_payment_id TEXT');
+}
+
+// Migration: committee directory photos on the public site (stored as base64 data URLs, no file storage needed)
+const coreMemberColumns = db.prepare('PRAGMA table_info(core_members)').all().map((c) => c.name);
+if (!coreMemberColumns.includes('photo')) {
+  db.exec('ALTER TABLE core_members ADD COLUMN photo TEXT');
 }
 
 // Seed a default admin account on first run
