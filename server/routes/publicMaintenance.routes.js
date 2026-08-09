@@ -18,17 +18,22 @@ function findMembers(query) {
 
 router.get('/dues', (req, res) => {
   const members = findMembers(req.query.q);
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
   if (members.length) {
-    const now = new Date();
-    ensureDuesGenerated(now.getMonth() + 1, now.getFullYear());
+    ensureDuesGenerated(currentMonth, currentYear);
   }
   const results = members.map((m) => {
+    // Show the current month plus any missed past months (arrears) - never a future month's due
     const dues = db
       .prepare(
         `SELECT id, month, year, amount_due, amount_paid, status FROM maintenance_payments
-         WHERE member_id = ? AND status != 'paid' ORDER BY year, month`
+         WHERE member_id = ? AND status != 'paid'
+           AND (year < ? OR (year = ? AND month <= ?))
+         ORDER BY year, month`
       )
-      .all(m.id);
+      .all(m.id, currentYear, currentYear, currentMonth);
     return { member_id: m.id, name: m.name, site_no: m.site_no, dues };
   });
   res.json(results);
