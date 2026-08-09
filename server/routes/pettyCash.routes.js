@@ -11,7 +11,8 @@ function computeSummary() {
   const totalExpenses = db
     .prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM petty_cash_transactions WHERE type = 'expense'")
     .get().s;
-  return { totalTopups, totalExpenses, balance: totalTopups - totalExpenses };
+  const openingBalance = db.prepare('SELECT opening_petty_cash_balance FROM general_settings WHERE id = 1').get()?.opening_petty_cash_balance || 0;
+  return { totalTopups, totalExpenses, balance: openingBalance + totalTopups - totalExpenses };
 }
 
 router.get('/', requireAuth, (req, res) => {

@@ -21,7 +21,7 @@ window.DashboardPage = {
         <div class="stat-card"><div class="label">Core Members</div><div class="value">${summary.coreMemberCount}</div></div>
         <div class="stat-card"><div class="label">Upcoming Events</div><div class="value">${summary.upcomingEvents}</div></div>
         <div class="stat-card"><div class="label">Maintenance Collected</div><div class="value">${Util.money(summary.totalMaintenanceCollected)}</div></div>
-        <div class="stat-card ${summary.totalMaintenanceDue > 0 ? 'negative' : ''}"><div class="label">Maintenance Due</div><div class="value">${Util.money(summary.totalMaintenanceDue)}</div></div>
+        <div class="stat-card ${summary.totalMaintenanceDue > 0 ? 'negative' : ''}"><div class="label">Maintenance Due (This Month)</div><div class="value">${Util.money(summary.totalMaintenanceDue)}</div></div>
         <div class="stat-card"><div class="label">Total Donations</div><div class="value">${Util.money(summary.totalDonations)}</div></div>
         <div class="stat-card"><div class="label">Total Expenses</div><div class="value">${Util.money(summary.totalExpenses)}</div></div>
         <div class="stat-card ${summary.balance < 0 ? 'negative' : ''}"><div class="label">Net Balance</div><div class="value">${Util.money(summary.balance)}</div></div>

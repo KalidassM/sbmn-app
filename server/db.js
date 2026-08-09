@@ -142,6 +142,15 @@ CREATE TABLE IF NOT EXISTS general_settings (
 db.prepare('INSERT OR IGNORE INTO payment_settings (id) VALUES (1)').run();
 db.prepare('INSERT OR IGNORE INTO general_settings (id) VALUES (1)').run();
 
+// Migration: opening balances that predate digital tracking (bank account + petty cash box)
+const generalSettingsColumns = db.prepare('PRAGMA table_info(general_settings)').all().map((c) => c.name);
+if (!generalSettingsColumns.includes('opening_bank_balance')) {
+  db.exec('ALTER TABLE general_settings ADD COLUMN opening_bank_balance REAL NOT NULL DEFAULT 0');
+}
+if (!generalSettingsColumns.includes('opening_petty_cash_balance')) {
+  db.exec('ALTER TABLE general_settings ADD COLUMN opening_petty_cash_balance REAL NOT NULL DEFAULT 0');
+}
+
 // Migration: add site_no to members if the table pre-dates this column
 const memberColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
 if (!memberColumns.includes('site_no')) {
