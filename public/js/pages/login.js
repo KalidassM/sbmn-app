@@ -17,7 +17,9 @@ window.LoginPage = {
             </div>
             <button type="submit" style="width:100%">Log in</button>
           </form>
-          <p class="text-muted" style="text-align:center;margin-top:16px;font-size:0.85rem;">Not a member? <a href="/donate">Donate as a well-wisher</a></p>
+          <p class="text-muted" style="text-align:center;margin-top:16px;font-size:0.85rem;">
+            <a href="/pay-monthly-maintenance">Pay your monthly maintenance</a> &middot; Not a member? <a href="/donate">Donate as a well-wisher</a>
+          </p>
         </div>
       </div>
     `;

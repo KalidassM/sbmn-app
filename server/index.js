@@ -21,6 +21,7 @@ const publicDonationsRoutes = require('./routes/publicDonations.routes');
 const noticeRoutes = require('./routes/notices.routes');
 const contactMessageRoutes = require('./routes/contactMessages.routes');
 const publicSiteRoutes = require('./routes/publicSite.routes');
+const publicMaintenanceRoutes = require('./routes/publicMaintenance.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,11 +45,16 @@ app.use('/api/public/donations', publicDonationsRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/contact-messages', contactMessageRoutes);
 app.use('/api/public/site', publicSiteRoutes);
+app.use('/api/public/maintenance', publicMaintenanceRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/donate', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'donate.html'));
+});
+
+app.get('/pay-monthly-maintenance', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'pay-maintenance.html'));
 });
 
 // The member/admin portal (hash-routed SPA) lives at /portal; "/" is the public marketing site
