@@ -28,6 +28,58 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   res.status(201).json(member);
 });
 
+// Upsert by site_no: rows whose site_no matches an existing member update that member, others are inserted
+router.post('/bulk', requireAuth, requireAdmin, (req, res) => {
+  const { members } = req.body || {};
+  if (!Array.isArray(members) || !members.length) {
+    return res.status(400).json({ error: 'members array is required' });
+  }
+
+  const insertStmt = db.prepare(
+    `INSERT INTO members (name, site_no, address, phone, email, join_date, status)
+     VALUES (?, ?, ?, ?, ?, COALESCE(?, date('now')), COALESCE(?, 'active'))`
+  );
+  const updateStmt = db.prepare(
+    `UPDATE members SET name = ?, address = COALESCE(?, address), phone = COALESCE(?, phone), email = COALESCE(?, email),
+       join_date = COALESCE(?, join_date), status = COALESCE(?, status)
+     WHERE id = ?`
+  );
+  const findBySiteNo = db.prepare('SELECT id FROM members WHERE site_no = ?');
+
+  let inserted = 0;
+  let updated = 0;
+  const skipped = [];
+
+  db.transaction((rows) => {
+    rows.forEach((row, idx) => {
+      const name = (row.name || '').toString().trim();
+      const siteNo = (row.site_no || '').toString().trim() || null;
+      if (!name) {
+        skipped.push({ row: idx + 2, reason: 'Missing name' });
+        return;
+      }
+      const existing = siteNo ? findBySiteNo.get(siteNo) : null;
+      if (existing) {
+        updateStmt.run(
+          name,
+          row.address || null,
+          row.phone || null,
+          row.email || null,
+          row.join_date || null,
+          row.status || null,
+          existing.id
+        );
+        updated++;
+      } else {
+        insertStmt.run(name, siteNo, row.address || null, row.phone || null, row.email || null, row.join_date || null, row.status || null);
+        inserted++;
+      }
+    });
+  })(members);
+
+  res.json({ inserted, updated, skipped });
+});
+
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Member not found' });
