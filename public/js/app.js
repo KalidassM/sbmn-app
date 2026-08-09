@@ -40,16 +40,16 @@ const Util = {
 };
 
 const NAV_ITEMS = [
-  { path: '#/dashboard', label: 'Dashboard' },
-  { path: '#/maintenance', label: 'Maintenance' },
-  { path: '#/expenses', label: 'Expenses & Petty Cash' },
-  { path: '#/members', label: 'Members' },
-  { path: '#/events', label: 'Events' },
-  { path: '#/core-members', label: 'Core Members' },
-  { path: '#/donations', label: 'Donations' },
-  { path: '#/contact-messages', label: 'Contact Messages', adminOnly: true },
-  { path: '#/users', label: 'Login Accounts', adminOnly: true },
-  { path: '#/payment-settings', label: 'Payment Settings', adminOnly: true },
+  { path: '#/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
+  { path: '#/maintenance', label: 'Maintenance', icon: 'bi-house-gear' },
+  { path: '#/expenses', label: 'Expenses & Petty Cash', icon: 'bi-cash-coin' },
+  { path: '#/members', label: 'Members', icon: 'bi-people' },
+  { path: '#/events', label: 'Events', icon: 'bi-calendar-event' },
+  { path: '#/core-members', label: 'Core Members', icon: 'bi-person-badge' },
+  { path: '#/donations', label: 'Donations', icon: 'bi-heart' },
+  { path: '#/contact-messages', label: 'Contact Messages', icon: 'bi-envelope', adminOnly: true },
+  { path: '#/users', label: 'Login Accounts', icon: 'bi-shield-lock', adminOnly: true },
+  { path: '#/payment-settings', label: 'Payment Settings', icon: 'bi-credit-card', adminOnly: true },
 ];
 
 const PAGES = {
@@ -69,21 +69,55 @@ function renderShell() {
   const user = Api.getUser();
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="shell">
-      <aside class="sidebar">
-        <h2>Sri Balamurugan Nagar Welfare Association</h2>
-        <div class="org-sub">Management Portal &middot; <a href="/" style="color:inherit;">Public Site</a></div>
-        <nav id="nav"></nav>
-        <div class="user-box">
-          Signed in as <strong>${Util.escapeHtml(user.username)}</strong>
-          <div><span class="role-tag">${user.role === 'admin' ? 'Core Member / Admin' : 'Member'}</span></div>
-          <button class="logout" id="logoutBtn">Log out</button>
+    <div class="app-wrapper">
+      <nav class="app-header navbar navbar-expand bg-body">
+        <div class="container-fluid">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button" aria-label="Toggle sidebar">
+                <i class="bi bi-list"></i>
+              </a>
+            </li>
+          </ul>
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item d-none d-sm-flex align-items-center">
+              <span class="nav-link disabled">
+                Signed in as <strong>${Util.escapeHtml(user.username)}</strong>
+                <span class="role-tag">${user.role === 'admin' ? 'Core Member / Admin' : 'Member'}</span>
+              </span>
+            </li>
+            <li class="nav-item">
+              <a href="/" class="nav-link" title="Public Site" aria-label="Public Site"><i class="bi bi-house"></i></a>
+            </li>
+            <li class="nav-item">
+              <a href="#" id="logoutBtn" class="nav-link" title="Log out" aria-label="Log out"><i class="bi bi-box-arrow-right"></i></a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+        <div class="sidebar-brand">
+          <a href="#/dashboard" class="brand-link">
+            <span class="brand-text fw-light">Sri Balamurugan Nagar Welfare Association</span>
+          </a>
+        </div>
+        <div class="sidebar-wrapper">
+          <nav class="mt-2" aria-label="Main navigation">
+            <ul class="nav sidebar-menu flex-column" id="nav"></ul>
+          </nav>
         </div>
       </aside>
-      <main class="main" id="main"></main>
+
+      <main class="app-main">
+        <div class="app-content">
+          <div class="container-fluid main" id="main"></div>
+        </div>
+      </main>
     </div>
   `;
-  document.getElementById('logoutBtn').addEventListener('click', () => {
+  document.getElementById('logoutBtn').addEventListener('click', (e) => {
+    e.preventDefault();
     Api.clearSession();
     window.location.hash = '#/login';
   });
@@ -95,8 +129,13 @@ function renderNav(activePath) {
   if (!nav) return;
   nav.innerHTML = NAV_ITEMS.filter((item) => !item.adminOnly || user.role === 'admin')
     .map(
-      (item) =>
-        `<a href="${item.path}" class="${item.path === activePath ? 'active' : ''}">${item.label}</a>`
+      (item) => `
+      <li class="nav-item">
+        <a href="${item.path}" class="nav-link ${item.path === activePath ? 'active' : ''}">
+          <i class="nav-icon bi ${item.icon}"></i>
+          <p>${item.label}</p>
+        </a>
+      </li>`
     )
     .join('');
 }

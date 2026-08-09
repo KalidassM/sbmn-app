@@ -71,84 +71,23 @@ body {
   padding: 8px 10px;
 }
 
-/* App shell */
-.shell {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 100vh;
-}
+/* App shell (AdminLTE-based; see portal.html/app.js for the markup) */
+.app-sidebar { background: var(--primary-dark) !important; }
+.app-sidebar .brand-text { font-size: 1rem; line-height: 1.25; }
+.app-sidebar .nav-link.active { background: var(--primary); font-weight: 600; }
 
-.sidebar {
-  background: var(--primary-dark);
-  color: #f1f5f2;
-  padding: 20px 14px;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar h2 {
-  font-size: 1.05rem;
-  margin: 0 0 4px;
-  color: #ffffff;
-}
-
-.sidebar .org-sub {
-  font-size: 0.75rem;
-  color: #b9d4c4;
-  margin-bottom: 22px;
-}
-
-.sidebar nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.sidebar nav a {
-  color: #d8e7de;
-  text-decoration: none;
-  padding: 9px 12px;
-  border-radius: 7px;
-  font-size: 0.92rem;
-}
-
-.sidebar nav a:hover { background: rgba(255,255,255,0.08); }
-.sidebar nav a.active { background: var(--primary); color: #fff; font-weight: 600; }
-
-.sidebar .user-box {
-  border-top: 1px solid rgba(255,255,255,0.15);
-  padding-top: 12px;
-  font-size: 0.82rem;
-}
-
-.sidebar .user-box .role-tag {
+.role-tag {
   display: inline-block;
   background: var(--accent);
   color: #2a1f04;
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.7rem;
-  margin-top: 4px;
+  margin-left: 6px;
 }
-
-.sidebar button.logout {
-  margin-top: 10px;
-  width: 100%;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.3);
-  color: #f1f5f2;
-  padding: 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-
-.sidebar button.logout:hover { background: rgba(255,255,255,0.1); }
 
 .main {
   padding: 26px 32px;
-  overflow-y: auto;
 }
 
 .main h1 {
@@ -201,6 +140,7 @@ body {
   border-radius: var(--radius);
   padding: 18px 20px;
   margin-bottom: 20px;
+  overflow-x: auto;
 }
 
 .panel-header {
@@ -345,3 +285,8 @@ label {
 .modal-box h3 { margin: 0 0 10px; color: var(--primary-dark); }
 .modal-box img { max-width: 100%; border-radius: 6px; }
 .modal-box .close-modal { margin-top: 16px; }
+
+@media (max-width: 600px) {
+  .main { padding: 16px; }
+  .form-grid { grid-template-columns: 1fr; }
+}
