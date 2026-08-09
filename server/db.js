@@ -158,6 +158,12 @@ if (!maintenancePaymentColumns.includes('razorpay_order_id')) {
 if (!maintenancePaymentColumns.includes('razorpay_payment_id')) {
   db.exec('ALTER TABLE maintenance_payments ADD COLUMN razorpay_payment_id TEXT');
 }
+if (!maintenancePaymentColumns.includes('payment_mode')) {
+  db.exec('ALTER TABLE maintenance_payments ADD COLUMN payment_mode TEXT');
+}
+if (!maintenancePaymentColumns.includes('reference_no')) {
+  db.exec('ALTER TABLE maintenance_payments ADD COLUMN reference_no TEXT');
+}
 
 // Migration: mark existing expenses as bank-sourced now that petty cash is a second source
 const expenseColumns = db.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name);

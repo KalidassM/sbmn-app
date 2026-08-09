@@ -86,9 +86,10 @@ router.post('/verify', requireAuth, (req, res) => {
 
   db.prepare(
     `UPDATE maintenance_payments
-     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), razorpay_payment_id = ?
+     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), razorpay_payment_id = ?,
+         payment_mode = 'Razorpay', reference_no = ?
      WHERE id = ?`
-  ).run(razorpay_payment_id, due.id);
+  ).run(razorpay_payment_id, razorpay_payment_id, due.id);
 
   const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
   res.json({ ok: true, payment: updated });

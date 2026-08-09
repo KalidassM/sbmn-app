@@ -77,7 +77,7 @@ router.get('/payments', requireAuth, (req, res) => {
 router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Payment record not found' });
-  const { amount_paid, paid_date, status } = req.body || {};
+  const { amount_paid, paid_date, status, payment_mode, reference_no } = req.body || {};
   const finalAmountPaid = amount_paid ?? existing.amount_paid;
   let finalStatus = status;
   if (!finalStatus) {
@@ -86,11 +86,13 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
     else finalStatus = 'partial';
   }
   db.prepare(
-    `UPDATE maintenance_payments SET amount_paid = ?, paid_date = ?, status = ? WHERE id = ?`
+    `UPDATE maintenance_payments SET amount_paid = ?, paid_date = ?, status = ?, payment_mode = ?, reference_no = ? WHERE id = ?`
   ).run(
     finalAmountPaid,
     paid_date ?? (finalStatus === 'paid' ? new Date().toISOString().slice(0, 10) : existing.paid_date),
     finalStatus,
+    payment_mode !== undefined ? payment_mode || null : existing.payment_mode,
+    reference_no !== undefined ? reference_no || null : existing.reference_no,
     req.params.id
   );
   const row = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);

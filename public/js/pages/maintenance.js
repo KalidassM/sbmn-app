@@ -26,8 +26,8 @@ window.MaintenancePage = {
           <div class="field"><button id="generateBtn" class="secondary">Generate / Refresh Dues</button></div>
         </div>` : ''}
         <table>
-          <thead><tr><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Status</th><th></th></tr></thead>
-          <tbody id="paymentRows"><tr><td colspan="6">Loading…</td></tr></tbody>
+          <thead><tr><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Mode</th><th>Reference</th><th>Status</th><th></th></tr></thead>
+          <tbody id="paymentRows"><tr><td colspan="8">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -107,7 +107,7 @@ window.MaintenancePage = {
     }
     const rows = document.getElementById('paymentRows');
     if (!payments.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="6">No dues recorded for this month yet${isAdmin ? ' — set an amount and click Generate' : ''}</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="8">No dues recorded for this month yet${isAdmin ? ' — set an amount and click Generate' : ''}</td></tr>`;
       return;
     }
     rows.innerHTML = payments
@@ -118,6 +118,8 @@ window.MaintenancePage = {
         <td>${Util.money(p.amount_due)}</td>
         <td>${Util.money(p.amount_paid)}</td>
         <td>${p.paid_date || '-'}</td>
+        <td>${Util.escapeHtml(p.payment_mode || '-')}</td>
+        <td>${Util.escapeHtml(p.reference_no || '-')}</td>
         <td><span class="badge ${p.status}">${p.status}</span></td>
         <td class="toolbar">
           ${p.status !== 'paid' ? `<button class="small" data-pay="${p.id}">Pay Now</button>` : ''}
@@ -151,6 +153,17 @@ window.MaintenancePage = {
       <form id="recordPaymentForm" style="text-align:left;">
         <div class="field"><label>Amount Paid</label><input id="rp_amount" type="number" step="0.01" min="0" required value="${payment.amount_due}" /></div>
         <div class="field"><label>Payment Date</label><input id="rp_date" type="date" required value="${Util.todayISO()}" /></div>
+        <div class="field"><label>Payment Mode</label>
+          <select id="rp_mode">
+            <option value="Cash" ${payment.payment_mode === 'Cash' ? 'selected' : ''}>Cash</option>
+            <option value="UPI" ${payment.payment_mode === 'UPI' ? 'selected' : ''}>UPI</option>
+            <option value="Card" ${payment.payment_mode === 'Card' ? 'selected' : ''}>Card</option>
+            <option value="Bank Transfer" ${payment.payment_mode === 'Bank Transfer' ? 'selected' : ''}>Bank Transfer</option>
+            <option value="Cheque" ${payment.payment_mode === 'Cheque' ? 'selected' : ''}>Cheque</option>
+            <option value="Other" ${payment.payment_mode === 'Other' ? 'selected' : ''}>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Transaction / Reference No (optional)</label><input id="rp_reference" value="${Util.escapeHtml(payment.reference_no || '')}" placeholder="e.g. UPI ref, cheque no..." /></div>
         <p class="text-muted" style="font-size:0.8rem;">Use this for cash or bank-transfer payments collected outside the app. Enter less than the full amount to record a partial payment.</p>
         <div class="toolbar close-modal mt-16" style="justify-content:center;">
           <button type="submit">Save</button>
@@ -163,10 +176,18 @@ window.MaintenancePage = {
       e.preventDefault();
       const amountPaid = Number(document.getElementById('rp_amount').value);
       const paidDate = document.getElementById('rp_date').value;
+      const paymentMode = document.getElementById('rp_mode').value;
+      const referenceNo = document.getElementById('rp_reference').value.trim();
       if (!paidDate || amountPaid < 0) return;
       const status = amountPaid >= Number(payment.amount_due) ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
       try {
-        await Api.put(`/maintenance/payments/${payment.id}`, { amount_paid: amountPaid, status, paid_date: paidDate });
+        await Api.put(`/maintenance/payments/${payment.id}`, {
+          amount_paid: amountPaid,
+          status,
+          paid_date: paidDate,
+          payment_mode: paymentMode,
+          reference_no: referenceNo || null,
+        });
         Util.closeModal();
         await this.loadDues();
         this.showAlert('Payment recorded.', 'success');
