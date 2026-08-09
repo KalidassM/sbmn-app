@@ -13,7 +13,7 @@ window.MembersPage = {
       <div class="panel">
         <div class="panel-header"><h3>All Members</h3></div>
         <table>
-          <thead><tr><th>Name</th><th>Site No</th><th>Phone</th><th>Email</th><th>Address</th><th>Joined</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <thead><tr><th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Joined</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
           <tbody id="rows"><tr><td colspan="8">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -142,8 +142,8 @@ window.MembersPage = {
       .map(
         (m) => `
       <tr>
-        <td>${Util.escapeHtml(m.name)}</td>
         <td>${Util.escapeHtml(m.site_no || '-')}</td>
+        <td>${Util.escapeHtml(m.name)}</td>
         <td>${Util.escapeHtml(m.phone || '-')}</td>
         <td>${Util.escapeHtml(m.email || '-')}</td>
         <td>${Util.escapeHtml(m.address || '-')}</td>
