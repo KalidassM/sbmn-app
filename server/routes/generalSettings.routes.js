@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { sendMail } = require('../utils/mailer');
 
 const router = express.Router();
 
@@ -60,6 +61,22 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
   );
   const row = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
   res.json(toPublicSettings(row));
+});
+
+router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
+  const settings = db.prepare('SELECT contact_email FROM general_settings WHERE id = 1').get();
+  const to = settings?.contact_email;
+  if (!to) return res.status(400).json({ error: 'Set a Contact Email in General Settings first' });
+  try {
+    await sendMail({
+      to,
+      subject: 'SBMN App - Test Email',
+      html: '<p>This is a test email from your SBMN app\'s General Settings. If you received this, SMTP is working correctly.</p>',
+    });
+    res.json({ ok: true, to });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
 module.exports = router;

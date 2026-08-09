@@ -39,7 +39,10 @@ window.GeneralSettingsPage = {
         <div class="field"><label>From Email (optional, defaults to username)</label><input id="smtpFromEmail" type="email" /></div>
         <p class="text-muted" style="font-size:0.85rem;">Used to send the payment-received notification above. Most providers (Gmail, Zoho, Outlook) require an app-specific password, not your normal login password.</p>
 
-        <div class="toolbar mt-16"><button type="submit">Save</button></div>
+        <div class="toolbar mt-16">
+          <button type="submit">Save</button>
+          <button type="button" class="secondary" id="testEmailBtn">Send Test Email</button>
+        </div>
         </form>
       </div>
     `;
@@ -83,6 +86,19 @@ window.GeneralSettingsPage = {
         this.render(container);
       } catch (err) {
         this.showAlert(err.message);
+      }
+    });
+
+    document.getElementById('testEmailBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('testEmailBtn');
+      btn.disabled = true;
+      try {
+        const result = await Api.post('/general-settings/test-email');
+        this.showAlert(`Test email sent to ${result.to}. Check the inbox.`, 'success');
+      } catch (err) {
+        this.showAlert(err.message);
+      } finally {
+        btn.disabled = false;
       }
     });
   },
