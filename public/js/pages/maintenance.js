@@ -109,12 +109,25 @@ window.MaintenancePage = {
         <td>${Util.escapeHtml(p.payment_mode || '-')}</td>
         <td>${Util.escapeHtml(p.reference_no || '-')}</td>
         <td><span class="badge ${p.status}">${p.status}</span></td>
-        ${isAdmin ? `<td class="toolbar"><button class="small danger" data-delete="${p.id}">Delete</button></td>` : ''}
+        ${
+          isAdmin
+            ? `<td class="toolbar">
+                <button class="small secondary" data-edit="${p.id}">Edit</button>
+                <button class="small danger" data-delete="${p.id}">Delete</button>
+              </td>`
+            : ''
+        }
       </tr>`
       )
       .join('');
 
     if (isAdmin) {
+      rows.querySelectorAll('[data-edit]').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          const payment = this.currentPayments.find((x) => String(x.id) === btn.dataset.edit);
+          this.showEditModal(payment);
+        })
+      );
       rows.querySelectorAll('[data-delete]').forEach((btn) =>
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this due record? This cannot be undone.')) return;
@@ -127,6 +140,67 @@ window.MaintenancePage = {
         })
       );
     }
+  },
+
+  showEditModal(payment) {
+    Util.openModal(`
+      <h3>Edit Due</h3>
+      <p class="text-muted">${Util.escapeHtml(payment.site_no || '-')} — ${Util.escapeHtml(payment.member_name)} — ${Util.monthName(payment.month)} ${payment.year}</p>
+      <form id="editDueForm" style="text-align:left;">
+        <div class="field"><label>Amount Due</label><input id="ed_amount_due" type="number" step="0.01" min="0" required value="${payment.amount_due}" /></div>
+        <div class="field"><label>Amount Paid</label><input id="ed_amount_paid" type="number" step="0.01" min="0" required value="${payment.amount_paid}" /></div>
+        <div class="field"><label>Status</label>
+          <select id="ed_status">
+            <option value="unpaid" ${payment.status === 'unpaid' ? 'selected' : ''}>Unpaid</option>
+            <option value="partial" ${payment.status === 'partial' ? 'selected' : ''}>Partial</option>
+            <option value="paid" ${payment.status === 'paid' ? 'selected' : ''}>Paid</option>
+          </select>
+        </div>
+        <div class="field"><label>Paid Date</label><input id="ed_date" type="date" value="${payment.paid_date || ''}" /></div>
+        <div class="field"><label>Payment Mode</label>
+          <select id="ed_mode">
+            <option value="" ${!payment.payment_mode ? 'selected' : ''}>-</option>
+            <option value="Cash" ${payment.payment_mode === 'Cash' ? 'selected' : ''}>Cash</option>
+            <option value="UPI" ${payment.payment_mode === 'UPI' ? 'selected' : ''}>UPI</option>
+            <option value="Card" ${payment.payment_mode === 'Card' ? 'selected' : ''}>Card</option>
+            <option value="Bank Transfer" ${payment.payment_mode === 'Bank Transfer' ? 'selected' : ''}>Bank Transfer</option>
+            <option value="Cheque" ${payment.payment_mode === 'Cheque' ? 'selected' : ''}>Cheque</option>
+            <option value="Razorpay" ${payment.payment_mode === 'Razorpay' ? 'selected' : ''}>Razorpay</option>
+            <option value="Other" ${payment.payment_mode === 'Other' ? 'selected' : ''}>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Transaction / Reference No</label><input id="ed_reference" value="${Util.escapeHtml(payment.reference_no || '')}" /></div>
+        <div class="toolbar close-modal mt-16" style="justify-content:center;">
+          <button type="submit">Save</button>
+          <button type="button" class="secondary" id="closeEditModalBtn">Cancel</button>
+        </div>
+      </form>
+    `);
+    document.getElementById('closeEditModalBtn').addEventListener('click', () => Util.closeModal());
+    document.getElementById('editDueForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amountDue = Number(document.getElementById('ed_amount_due').value);
+      const amountPaid = Number(document.getElementById('ed_amount_paid').value);
+      const status = document.getElementById('ed_status').value;
+      const paidDate = document.getElementById('ed_date').value || null;
+      const paymentMode = document.getElementById('ed_mode').value;
+      const referenceNo = document.getElementById('ed_reference').value.trim();
+      try {
+        await Api.put(`/maintenance/payments/${payment.id}`, {
+          amount_due: amountDue,
+          amount_paid: amountPaid,
+          status,
+          paid_date: paidDate,
+          payment_mode: paymentMode || null,
+          reference_no: referenceNo || null,
+        });
+        Util.closeModal();
+        await this.loadDues();
+        this.showAlert('Due updated.', 'success');
+      } catch (err) {
+        this.showAlert(err.message);
+      }
+    });
   },
 
   showRecordPaymentModal() {
