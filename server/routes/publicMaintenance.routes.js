@@ -3,6 +3,7 @@ const db = require('../db');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
+const { notifyAdminOfPayment } = require('../utils/paymentNotify');
 
 const router = express.Router();
 
@@ -123,6 +124,8 @@ router.post('/:id/verify', (req, res) => {
      WHERE id = ?`
   ).run(razorpay_payment_id, razorpay_payment_id, due.id);
 
+  const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
+  notifyAdminOfPayment(updated);
   res.json({ ok: true });
 });
 

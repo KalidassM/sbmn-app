@@ -181,6 +181,22 @@ Api.get('/public/site/summary')
   })
   .catch((e) => console.error('Failed to load site summary', e));
 
+/* ---------- ASSOCIATION PROFILE (falls back to the static text already in the markup) ---------- */
+Api.get('/public/site/profile')
+  .then((p) => {
+    if (p.office_address) document.getElementById('officeAddress').textContent = p.office_address;
+    if (p.phone_number) {
+      document.getElementById('officePhone').textContent = p.phone_number;
+      document.getElementById('footerPhone').textContent = p.phone_number;
+    }
+    if (p.contact_email) {
+      document.getElementById('officeEmail').textContent = p.contact_email;
+      document.getElementById('footerEmail').textContent = p.contact_email;
+    }
+    if (p.office_hours) document.getElementById('officeHours').textContent = p.office_hours;
+  })
+  .catch((e) => console.error('Failed to load association profile', e));
+
 /* ---------- NOTICES ---------- */
 async function renderNotices() {
   let notices = [];

@@ -101,7 +101,7 @@ function renderShell() {
       <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
         <div class="sidebar-brand">
           <a href="#/dashboard" class="brand-link">
-            <span class="brand-text fw-light">Sri Balamurugan Nagar Welfare Association</span>
+            <span class="brand-text fw-light" id="sidebarBrandText">Sri Balamurugan Nagar Welfare Association</span>
           </a>
         </div>
         <div class="sidebar-wrapper">
@@ -123,6 +123,15 @@ function renderShell() {
     Api.clearSession();
     window.location.hash = '#/login';
   });
+
+  Api.get('/general-settings')
+    .then((s) => {
+      if (s.app_name) {
+        document.getElementById('sidebarBrandText').textContent = s.app_name;
+        document.title = s.app_name;
+      }
+    })
+    .catch(() => {});
 }
 
 function renderNav(activePath) {

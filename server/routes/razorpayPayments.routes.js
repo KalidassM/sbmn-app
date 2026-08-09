@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
+const { notifyAdminOfPayment } = require('../utils/paymentNotify');
 
 const router = express.Router();
 
@@ -92,6 +93,7 @@ router.post('/verify', requireAuth, (req, res) => {
   ).run(razorpay_payment_id, razorpay_payment_id, due.id);
 
   const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
+  notifyAdminOfPayment(updated);
   res.json({ ok: true, payment: updated });
 });
 

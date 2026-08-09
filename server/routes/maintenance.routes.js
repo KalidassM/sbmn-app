@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
+const { notifyAdminOfPayment } = require('../utils/paymentNotify');
 
 const router = express.Router();
 
@@ -56,6 +57,9 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
     req.params.id
   );
   const row = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);
+  if (finalAmountPaid > existing.amount_paid) {
+    notifyAdminOfPayment(row);
+  }
   res.json(row);
 });
 

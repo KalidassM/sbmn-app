@@ -10,6 +10,14 @@ router.get('/summary', (req, res) => {
   res.json({ householdCount, activeNotices, upcomingEvents });
 });
 
+// Non-secret association profile fields (name/contact/address) for the public site to display
+router.get('/profile', (req, res) => {
+  const row = db
+    .prepare('SELECT app_name, contact_email, office_address, office_hours, phone_number FROM general_settings WHERE id = 1')
+    .get();
+  res.json(row || {});
+});
+
 router.get('/notices', (req, res) => {
   const rows = db.prepare('SELECT * FROM notices ORDER BY pinned DESC, created_at DESC').all();
   res.json(rows);
