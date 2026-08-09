@@ -26,8 +26,8 @@ window.MaintenancePage = {
           <div class="field"><button id="generateBtn" class="secondary">Generate / Refresh Dues</button></div>
         </div>` : ''}
         <table>
-          <thead><tr><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Mode</th><th>Reference</th><th>Status</th><th></th></tr></thead>
-          <tbody id="paymentRows"><tr><td colspan="8">Loading…</td></tr></tbody>
+          <thead><tr><th>Site No</th><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Mode</th><th>Reference</th><th>Status</th><th></th></tr></thead>
+          <tbody id="paymentRows"><tr><td colspan="9">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -107,13 +107,14 @@ window.MaintenancePage = {
     }
     const rows = document.getElementById('paymentRows');
     if (!payments.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="8">No dues recorded for this month yet${isAdmin ? ' — set an amount and click Generate' : ''}</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No dues recorded for this month yet${isAdmin ? ' — set an amount and click Generate' : ''}</td></tr>`;
       return;
     }
     rows.innerHTML = payments
       .map(
         (p) => `
       <tr>
+        <td>${Util.escapeHtml(p.site_no || '-')}</td>
         <td>${Util.escapeHtml(p.member_name)}</td>
         <td>${Util.money(p.amount_due)}</td>
         <td>${Util.money(p.amount_paid)}</td>
@@ -124,6 +125,7 @@ window.MaintenancePage = {
         <td class="toolbar">
           ${p.status !== 'paid' ? `<button class="small" data-pay="${p.id}">Pay Now</button>` : ''}
           ${isAdmin && p.status !== 'paid' ? `<button class="small secondary" data-record="${p.id}">Record Payment</button>` : ''}
+          ${isAdmin ? `<button class="small danger" data-delete="${p.id}">Delete</button>` : ''}
         </td>
       </tr>`
       )
@@ -141,6 +143,17 @@ window.MaintenancePage = {
         btn.addEventListener('click', () => {
           const payment = payments.find((p) => String(p.id) === btn.dataset.record);
           this.showRecordPaymentModal(payment);
+        })
+      );
+      rows.querySelectorAll('[data-delete]').forEach((btn) =>
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this due record? This cannot be undone.')) return;
+          try {
+            await Api.del(`/maintenance/payments/${btn.dataset.delete}`);
+            await this.loadDues();
+          } catch (err) {
+            this.showAlert(err.message);
+          }
         })
       );
     }

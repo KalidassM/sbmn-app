@@ -43,7 +43,7 @@ router.post('/generate', requireAuth, requireAdmin, (req, res) => {
 
   const payments = db
     .prepare(
-      `SELECT mp.*, m.name AS member_name FROM maintenance_payments mp
+      `SELECT mp.*, m.name AS member_name, m.site_no FROM maintenance_payments mp
        JOIN members m ON m.id = mp.member_id
        WHERE mp.month = ? AND mp.year = ? ORDER BY m.name`
     )
@@ -53,7 +53,7 @@ router.post('/generate', requireAuth, requireAdmin, (req, res) => {
 
 router.get('/payments', requireAuth, (req, res) => {
   const { month, year, member_id } = req.query;
-  let sql = `SELECT mp.*, m.name AS member_name FROM maintenance_payments mp
+  let sql = `SELECT mp.*, m.name AS member_name, m.site_no FROM maintenance_payments mp
              JOIN members m ON m.id = mp.member_id`;
   const clauses = [];
   const params = [];
@@ -97,6 +97,13 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
   );
   const row = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);
   res.json(row);
+});
+
+router.delete('/payments/:id', requireAuth, requireAdmin, (req, res) => {
+  const existing = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Payment record not found' });
+  db.prepare('DELETE FROM maintenance_payments WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
 });
 
 module.exports = router;
