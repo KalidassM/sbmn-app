@@ -150,8 +150,8 @@ if (!generalSettingsColumns.includes('opening_bank_balance')) {
 if (!generalSettingsColumns.includes('opening_petty_cash_balance')) {
   db.exec('ALTER TABLE general_settings ADD COLUMN opening_petty_cash_balance REAL NOT NULL DEFAULT 0');
 }
-if (!generalSettingsColumns.includes('reminders_last_sent')) {
-  db.exec('ALTER TABLE general_settings ADD COLUMN reminders_last_sent TEXT');
+if (generalSettingsColumns.includes('reminders_last_sent')) {
+  db.exec('ALTER TABLE general_settings DROP COLUMN reminders_last_sent');
 }
 
 // Migration: add site_no to members if the table pre-dates this column

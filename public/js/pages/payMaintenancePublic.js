@@ -172,7 +172,9 @@
     }
   }
 
-  async function runSearch(q) {
+  document.getElementById('searchForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const q = document.getElementById('q').value.trim();
     if (!q) return;
     try {
       const members = await request(`/dues?q=${encodeURIComponent(q)}`);
@@ -180,17 +182,5 @@
     } catch (err) {
       showAlert(err.message);
     }
-  }
-
-  document.getElementById('searchForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    runSearch(document.getElementById('q').value.trim());
   });
-
-  // Reminder links (?q=SITE_NO) pre-fill and auto-run the search so members don't have to type
-  const prefill = new URLSearchParams(window.location.search).get('q');
-  if (prefill) {
-    document.getElementById('q').value = prefill;
-    runSearch(prefill);
-  }
 })();

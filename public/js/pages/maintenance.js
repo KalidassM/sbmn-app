@@ -26,7 +26,6 @@ window.MaintenancePage = {
               <option value="paid">Paid</option>
             </select>
             ${isAdmin ? '<button id="recordPaymentBtn">Record Payment</button>' : ''}
-            ${isAdmin ? '<button id="sendRemindersBtn" class="secondary">Send Reminders Now</button>' : ''}
           </div>
         </div>
         <table>
@@ -53,7 +52,6 @@ window.MaintenancePage = {
 
     if (isAdmin) {
       document.getElementById('recordPaymentBtn').addEventListener('click', () => this.showRecordPaymentModal());
-      document.getElementById('sendRemindersBtn').addEventListener('click', () => this.sendReminders());
     }
 
     await this.loadDues();
@@ -62,27 +60,6 @@ window.MaintenancePage = {
   showAlert(message, type = 'error') {
     const box = document.getElementById('alertBox');
     if (box) box.innerHTML = `<div class="alert ${type}">${Util.escapeHtml(message)}</div>`;
-  },
-
-  async sendReminders() {
-    const force = this.remindersSentThisSession;
-    if (force && !confirm('Reminders for this month were already sent. Send again to everyone still unpaid?')) return;
-    const btn = document.getElementById('sendRemindersBtn');
-    btn.disabled = true;
-    try {
-      const result = await Api.post('/maintenance/send-reminders', { force });
-      if (result.skipped) {
-        this.showAlert(result.reason);
-      } else {
-        this.remindersSentThisSession = true;
-        const msg = `Reminders sent to ${result.sent.length} of ${result.totalDue} member(s) with dues this month.`;
-        this.showAlert(result.failed.length ? `${msg} ${result.failed.length} failed.` : msg, 'success');
-      }
-    } catch (err) {
-      this.showAlert(err.message);
-    } finally {
-      btn.disabled = false;
-    }
   },
 
   populateMonthYearSelects() {
