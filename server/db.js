@@ -131,9 +131,16 @@ CREATE TABLE IF NOT EXISTS payment_settings (
   razorpay_key_secret TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS general_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  maintenance_amount REAL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
 `);
 
 db.prepare('INSERT OR IGNORE INTO payment_settings (id) VALUES (1)').run();
+db.prepare('INSERT OR IGNORE INTO general_settings (id) VALUES (1)').run();
 
 // Migration: add site_no to members if the table pre-dates this column
 const memberColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);

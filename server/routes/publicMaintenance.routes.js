@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
+const { ensureDuesGenerated } = require('../utils/maintenanceDues');
 
 const router = express.Router();
 
@@ -17,6 +18,10 @@ function findMembers(query) {
 
 router.get('/dues', (req, res) => {
   const members = findMembers(req.query.q);
+  if (members.length) {
+    const now = new Date();
+    ensureDuesGenerated(now.getMonth() + 1, now.getFullYear());
+  }
   const results = members.map((m) => {
     const dues = db
       .prepare(

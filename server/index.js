@@ -22,6 +22,7 @@ const noticeRoutes = require('./routes/notices.routes');
 const contactMessageRoutes = require('./routes/contactMessages.routes');
 const publicSiteRoutes = require('./routes/publicSite.routes');
 const publicMaintenanceRoutes = require('./routes/publicMaintenance.routes');
+const generalSettingsRoutes = require('./routes/generalSettings.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,6 +47,7 @@ app.use('/api/notices', noticeRoutes);
 app.use('/api/contact-messages', contactMessageRoutes);
 app.use('/api/public/site', publicSiteRoutes);
 app.use('/api/public/maintenance', publicMaintenanceRoutes);
+app.use('/api/general-settings', generalSettingsRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 

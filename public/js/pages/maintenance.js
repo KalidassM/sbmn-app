@@ -1,5 +1,6 @@
 window.MaintenancePage = {
-  state: { month: new Date().getMonth() + 1, year: new Date().getFullYear() },
+  state: { month: new Date().getMonth() + 1, year: new Date().getFullYear(), statusFilter: 'all' },
+  currentPayments: [],
 
   async render(container) {
     const user = Api.getUser();
@@ -9,6 +10,7 @@ window.MaintenancePage = {
     container.innerHTML = `
       <h1>Monthly Maintenance</h1>
       <p class="page-sub">Track maintenance dues collection</p>
+      ${!isAdmin ? `<p class="page-sub" style="margin-top:-14px;">Want to pay online yourself? Visit <a href="/pay-monthly-maintenance" target="_blank">the maintenance payment page</a>.</p>` : ''}
       <div id="alertBox"></div>
 
       <div class="panel">
@@ -17,16 +19,17 @@ window.MaintenancePage = {
           <div class="toolbar">
             <select id="monthSelect"></select>
             <select id="yearSelect"></select>
+            <select id="statusFilter">
+              <option value="all">All</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="partial">Partial</option>
+              <option value="paid">Paid</option>
+            </select>
+            ${isAdmin ? '<button id="recordPaymentBtn">Record Payment</button>' : ''}
           </div>
         </div>
-        ${isAdmin ? `
-        <div class="form-grid" style="margin-bottom:14px;">
-          <div class="field"><label>Amount per member (₹)</label><input id="amountInput" type="number" step="0.01" /></div>
-          <div class="field"><button id="saveAmountBtn">Save Amount</button></div>
-          <div class="field"><button id="generateBtn" class="secondary">Generate / Refresh Dues</button></div>
-        </div>` : ''}
         <table>
-          <thead><tr><th>Site No</th><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Mode</th><th>Reference</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Site No</th><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Mode</th><th>Reference</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
           <tbody id="paymentRows"><tr><td colspan="9">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -41,10 +44,14 @@ window.MaintenancePage = {
       this.state.year = Number(e.target.value);
       this.loadDues();
     });
+    document.getElementById('statusFilter').value = this.state.statusFilter;
+    document.getElementById('statusFilter').addEventListener('change', (e) => {
+      this.state.statusFilter = e.target.value;
+      this.renderRows();
+    });
 
     if (isAdmin) {
-      document.getElementById('saveAmountBtn').addEventListener('click', () => this.saveAmount());
-      document.getElementById('generateBtn').addEventListener('click', () => this.generateDues());
+      document.getElementById('recordPaymentBtn').addEventListener('click', () => this.showRecordPaymentModal());
     }
 
     await this.loadDues();
@@ -68,46 +75,26 @@ window.MaintenancePage = {
       .join('');
   },
 
-  async saveAmount() {
-    const amount = Number(document.getElementById('amountInput').value);
-    if (!amount || amount <= 0) return this.showAlert('Enter a valid amount');
-    try {
-      await Api.post('/maintenance/settings', { month: this.state.month, year: this.state.year, amount });
-      this.showAlert('Maintenance amount saved. Click "Generate / Refresh Dues" to apply it to members.', 'success');
-    } catch (err) {
-      this.showAlert(err.message);
-    }
-  },
-
-  async generateDues() {
-    try {
-      await Api.post('/maintenance/generate', { month: this.state.month, year: this.state.year });
-      await this.loadDues();
-      this.showAlert('Dues generated for active members.', 'success');
-    } catch (err) {
-      this.showAlert(err.message);
-    }
-  },
-
   async loadDues() {
-    const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
     const { month, year } = this.state;
-
-    const settings = await Api.get('/maintenance/settings');
-    const setting = settings.find((s) => s.month === month && s.year === year);
-    if (isAdmin) {
-      const amountInput = document.getElementById('amountInput');
-      if (amountInput) amountInput.value = setting ? setting.amount : '';
-    }
-
     let payments = await Api.get(`/maintenance/payments?month=${month}&year=${year}`);
-    if (!isAdmin && user.member_id) {
+    const user = Api.getUser();
+    if (user.role !== 'admin' && user.member_id) {
       payments = payments.filter((p) => p.member_id === user.member_id);
     }
+    this.currentPayments = payments;
+    this.renderRows();
+  },
+
+  renderRows() {
+    const user = Api.getUser();
+    const isAdmin = user.role === 'admin';
+    const filter = this.state.statusFilter;
+    const payments = filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter);
+
     const rows = document.getElementById('paymentRows');
     if (!payments.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No dues recorded for this month yet${isAdmin ? ' — set an amount and click Generate' : ''}</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No dues match this view</td></tr>`;
       return;
     }
     rows.innerHTML = payments
@@ -122,29 +109,12 @@ window.MaintenancePage = {
         <td>${Util.escapeHtml(p.payment_mode || '-')}</td>
         <td>${Util.escapeHtml(p.reference_no || '-')}</td>
         <td><span class="badge ${p.status}">${p.status}</span></td>
-        <td class="toolbar">
-          ${p.status !== 'paid' ? `<button class="small" data-pay="${p.id}">Pay Now</button>` : ''}
-          ${isAdmin && p.status !== 'paid' ? `<button class="small secondary" data-record="${p.id}">Record Payment</button>` : ''}
-          ${isAdmin ? `<button class="small danger" data-delete="${p.id}">Delete</button>` : ''}
-        </td>
+        ${isAdmin ? `<td class="toolbar"><button class="small danger" data-delete="${p.id}">Delete</button></td>` : ''}
       </tr>`
       )
       .join('');
 
-    rows.querySelectorAll('[data-pay]').forEach((btn) =>
-      btn.addEventListener('click', () => {
-        const payment = payments.find((p) => String(p.id) === btn.dataset.pay);
-        this.showPayModal(payment);
-      })
-    );
-
     if (isAdmin) {
-      rows.querySelectorAll('[data-record]').forEach((btn) =>
-        btn.addEventListener('click', () => {
-          const payment = payments.find((p) => String(p.id) === btn.dataset.record);
-          this.showRecordPaymentModal(payment);
-        })
-      );
       rows.querySelectorAll('[data-delete]').forEach((btn) =>
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this due record? This cannot be undone.')) return;
@@ -159,24 +129,36 @@ window.MaintenancePage = {
     }
   },
 
-  showRecordPaymentModal(payment) {
+  showRecordPaymentModal() {
+    const unpaid = this.currentPayments.filter((p) => p.status !== 'paid');
+    if (!unpaid.length) {
+      this.showAlert('Everyone in this view has already paid in full.', 'success');
+      return;
+    }
+    const options = unpaid
+      .map((p) => {
+        const remaining = Number(p.amount_due) - Number(p.amount_paid);
+        return `<option value="${p.id}">${Util.escapeHtml(p.site_no || '-')} — ${Util.escapeHtml(p.member_name)} (${Util.money(remaining)} due)</option>`;
+      })
+      .join('');
+
     Util.openModal(`
       <h3>Record Payment</h3>
-      <p class="text-muted">${Util.escapeHtml(payment.member_name)} — ${Util.monthName(payment.month)} ${payment.year}</p>
       <form id="recordPaymentForm" style="text-align:left;">
-        <div class="field"><label>Amount Paid</label><input id="rp_amount" type="number" step="0.01" min="0" required value="${payment.amount_due}" /></div>
+        <div class="field"><label>Member</label><select id="rp_payment" required>${options}</select></div>
+        <div class="field"><label>Amount Paid</label><input id="rp_amount" type="number" step="0.01" min="0" required /></div>
         <div class="field"><label>Payment Date</label><input id="rp_date" type="date" required value="${Util.todayISO()}" /></div>
         <div class="field"><label>Payment Mode</label>
           <select id="rp_mode">
-            <option value="Cash" ${payment.payment_mode === 'Cash' ? 'selected' : ''}>Cash</option>
-            <option value="UPI" ${payment.payment_mode === 'UPI' ? 'selected' : ''}>UPI</option>
-            <option value="Card" ${payment.payment_mode === 'Card' ? 'selected' : ''}>Card</option>
-            <option value="Bank Transfer" ${payment.payment_mode === 'Bank Transfer' ? 'selected' : ''}>Bank Transfer</option>
-            <option value="Cheque" ${payment.payment_mode === 'Cheque' ? 'selected' : ''}>Cheque</option>
-            <option value="Other" ${payment.payment_mode === 'Other' ? 'selected' : ''}>Other</option>
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="Card">Card</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Other">Other</option>
           </select>
         </div>
-        <div class="field"><label>Transaction / Reference No (optional)</label><input id="rp_reference" value="${Util.escapeHtml(payment.reference_no || '')}" placeholder="e.g. UPI ref, cheque no..." /></div>
+        <div class="field"><label>Transaction / Reference No (optional)</label><input id="rp_reference" placeholder="e.g. UPI ref, cheque no..." /></div>
         <p class="text-muted" style="font-size:0.8rem;">Use this for cash or bank-transfer payments collected outside the app. Enter less than the full amount to record a partial payment.</p>
         <div class="toolbar close-modal mt-16" style="justify-content:center;">
           <button type="submit">Save</button>
@@ -184,14 +166,25 @@ window.MaintenancePage = {
         </div>
       </form>
     `);
+
+    const paymentSelect = document.getElementById('rp_payment');
+    const amountInput = document.getElementById('rp_amount');
+    const fillAmount = () => {
+      const p = unpaid.find((x) => String(x.id) === paymentSelect.value);
+      amountInput.value = p ? Number(p.amount_due) - Number(p.amount_paid) : '';
+    };
+    fillAmount();
+    paymentSelect.addEventListener('change', fillAmount);
+
     document.getElementById('closeRecordModalBtn').addEventListener('click', () => Util.closeModal());
     document.getElementById('recordPaymentForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const amountPaid = Number(document.getElementById('rp_amount').value);
+      const payment = unpaid.find((x) => String(x.id) === paymentSelect.value);
+      const amountPaid = Number(amountInput.value);
       const paidDate = document.getElementById('rp_date').value;
       const paymentMode = document.getElementById('rp_mode').value;
       const referenceNo = document.getElementById('rp_reference').value.trim();
-      if (!paidDate || amountPaid < 0) return;
+      if (!payment || !paidDate || amountPaid < 0) return;
       const status = amountPaid >= Number(payment.amount_due) ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
       try {
         await Api.put(`/maintenance/payments/${payment.id}`, {
@@ -209,96 +202,4 @@ window.MaintenancePage = {
       }
     });
   },
-
-  async showPayModal(payment) {
-    const remaining = Number(payment.amount_due) - Number(payment.amount_paid);
-    const note = `Maintenance ${Util.monthName(payment.month)} ${payment.year} - ${payment.member_name}`;
-    Util.openModal(`
-      <h3>Pay Maintenance Due</h3>
-      <p class="text-muted">${Util.escapeHtml(payment.member_name)} — ${Util.monthName(payment.month)} ${payment.year}</p>
-      <p style="font-size:1.4rem;font-weight:700;color:var(--primary-dark);">${Util.money(remaining)}</p>
-      <div id="gatewayContent"></div>
-      <div id="qrToggleWrap" class="mt-16"><button type="button" class="secondary small" id="toggleQrBtn">Or pay by scanning a UPI QR code</button></div>
-      <div id="qrContent"></div>
-      <div class="toolbar close-modal mt-16" style="justify-content:center;">
-        <button class="secondary" id="closeModalBtn">Close</button>
-      </div>
-    `);
-    document.getElementById('closeModalBtn').addEventListener('click', () => Util.closeModal());
-    document.getElementById('toggleQrBtn').addEventListener('click', () => this.loadQr(payment, remaining, note));
-
-    const gatewayBox = document.getElementById('gatewayContent');
-    try {
-      const config = await Api.get('/payments/razorpay/config');
-      if (config.configured) {
-        gatewayBox.innerHTML = `<button id="payOnlineBtn" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-        document.getElementById('payOnlineBtn').addEventListener('click', () => this.payWithRazorpay(payment, remaining, note));
-        document.getElementById('qrToggleWrap').querySelector('button').textContent = 'Or scan a UPI QR code instead';
-      } else {
-        // Gateway isn't set up yet — go straight to the UPI QR path
-        document.getElementById('qrToggleWrap').style.display = 'none';
-        await this.loadQr(payment, remaining, note);
-      }
-    } catch (err) {
-      gatewayBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-    }
-  },
-
-  async loadQr(payment, remaining, note) {
-    document.getElementById('toggleQrBtn').style.display = 'none';
-    const qrBox = document.getElementById('qrContent');
-    qrBox.innerHTML = '<p class="text-muted">Loading QR code…</p>';
-    try {
-      const data = await Api.get(`/payment-settings/qr?amount=${remaining}&note=${encodeURIComponent(note)}`);
-      qrBox.innerHTML = `
-        <img src="${data.qrDataUrl}" alt="UPI QR code" width="220" height="220" />
-        <p class="text-muted mt-16">Scan with any UPI app (GPay, PhonePe, Paytm...), or on your phone <a href="${Util.escapeHtml(data.upiUri)}">tap here to pay</a>.</p>
-        <p class="text-muted" style="font-size:0.78rem;">After paying, let a core member know so they can mark this as paid.</p>
-      `;
-    } catch (err) {
-      qrBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-    }
-  },
-
-  async payWithRazorpay(payment, remaining, note) {
-    const gatewayBox = document.getElementById('gatewayContent');
-    try {
-      const order = await Api.post('/payments/razorpay/order', { payment_id: payment.id });
-      const rzp = new Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: order.payeeName,
-        description: note,
-        order_id: order.orderId,
-        handler: async (response) => {
-          gatewayBox.innerHTML = '<p class="text-muted">Verifying payment…</p>';
-          try {
-            await Api.post('/payments/razorpay/verify', {
-              payment_id: payment.id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-            Util.closeModal();
-            await this.loadDues();
-            this.showAlert('Payment received — marked as paid automatically.', 'success');
-          } catch (err) {
-            gatewayBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            gatewayBox.innerHTML = `<button id="payOnlineBtn" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-            document.getElementById('payOnlineBtn').addEventListener('click', () => this.payWithRazorpay(payment, remaining, note));
-          },
-        },
-        theme: { color: '#2f6f4e' },
-      });
-      rzp.open();
-    } catch (err) {
-      gatewayBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-    }
-  },
-
 };

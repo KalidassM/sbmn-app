@@ -50,6 +50,7 @@ const NAV_ITEMS = [
   { path: '#/contact-messages', label: 'Contact Messages', icon: 'bi-envelope', adminOnly: true },
   { path: '#/users', label: 'Login Accounts', icon: 'bi-shield-lock', adminOnly: true },
   { path: '#/payment-settings', label: 'Payment Settings', icon: 'bi-credit-card', adminOnly: true },
+  { path: '#/general-settings', label: 'General Settings', icon: 'bi-gear', adminOnly: true },
 ];
 
 const PAGES = {
@@ -63,6 +64,7 @@ const PAGES = {
   '#/contact-messages': window.ContactMessagesPage,
   '#/users': window.UsersPage,
   '#/payment-settings': window.PaymentSettingsPage,
+  '#/general-settings': window.GeneralSettingsPage,
 };
 
 function renderShell() {
