@@ -2,8 +2,20 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
+const { sendMonthlyReminders } = require('../utils/maintenanceReminders');
 
 const router = express.Router();
+
+// Manual trigger for the same reminder logic the 1st-of-month scheduler runs - lets an admin test
+// or re-run it without waiting. force:true bypasses the "already sent this month" guard.
+router.post('/send-reminders', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await sendMonthlyReminders({ force: !!(req.body && req.body.force) });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.get('/payments', requireAuth, (req, res) => {
   const { month, year, member_id } = req.query;

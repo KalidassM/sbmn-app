@@ -23,6 +23,7 @@ const contactMessageRoutes = require('./routes/contactMessages.routes');
 const publicSiteRoutes = require('./routes/publicSite.routes');
 const publicMaintenanceRoutes = require('./routes/publicMaintenance.routes');
 const generalSettingsRoutes = require('./routes/generalSettings.routes');
+const { sendMonthlyReminders } = require('./utils/maintenanceReminders');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -71,3 +72,25 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Sri Balamurugan Nagar Welfare Association app running at http://localhost:${PORT}`);
 });
+
+// On the 1st of each month (India time), send WhatsApp reminders to anyone with a due that month.
+// sendMonthlyReminders() is idempotent (guards on general_settings.reminders_last_sent), so an
+// hourly check is enough - no cron dependency needed, and it self-heals if the server restarts.
+function isFirstOfMonthInIndia() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', day: '2-digit' }).format(new Date()) === '01';
+}
+
+async function checkMonthlyReminders() {
+  if (!isFirstOfMonthInIndia()) return;
+  try {
+    const result = await sendMonthlyReminders();
+    if (!result.skipped) {
+      console.log(`Monthly maintenance reminders: sent ${result.sent.length}, failed ${result.failed.length}`);
+    }
+  } catch (err) {
+    console.error('Monthly reminder check failed:', err.message);
+  }
+}
+
+setInterval(checkMonthlyReminders, 60 * 60 * 1000);
+checkMonthlyReminders();
