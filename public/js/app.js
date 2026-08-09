@@ -138,6 +138,18 @@ function renderNav(activePath) {
       </li>`
     )
     .join('');
+
+  // On mobile the sidebar opens as an overlay (body.sidebar-open); close it after picking a page
+  nav.querySelectorAll('a').forEach((a) =>
+    a.addEventListener('click', () => {
+      if (document.body.classList.contains('sidebar-open')) {
+        const sidebar = document.querySelector('.app-sidebar');
+        if (sidebar && window.adminlte) {
+          window.adminlte.PushMenu.getOrCreateInstance(sidebar).collapse();
+        }
+      }
+    })
+  );
 }
 
 async function router() {
