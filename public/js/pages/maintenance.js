@@ -121,7 +121,7 @@ window.MaintenancePage = {
         <td><span class="badge ${p.status}">${p.status}</span></td>
         <td class="toolbar">
           ${p.status !== 'paid' ? `<button class="small" data-pay="${p.id}">Pay Now</button>` : ''}
-          ${isAdmin && p.status !== 'paid' ? `<button class="small secondary" data-mark-paid="${p.id}">Mark Paid</button>` : ''}
+          ${isAdmin && p.status !== 'paid' ? `<button class="small secondary" data-record="${p.id}">Record Payment</button>` : ''}
         </td>
       </tr>`
       )
@@ -135,22 +135,45 @@ window.MaintenancePage = {
     );
 
     if (isAdmin) {
-      rows.querySelectorAll('[data-mark-paid]').forEach((btn) =>
-        btn.addEventListener('click', async () => {
-          const payment = payments.find((p) => String(p.id) === btn.dataset.markPaid);
-          try {
-            await Api.put(`/maintenance/payments/${payment.id}`, {
-              amount_paid: payment.amount_due,
-              status: 'paid',
-              paid_date: Util.todayISO(),
-            });
-            await this.loadDues();
-          } catch (err) {
-            this.showAlert(err.message);
-          }
+      rows.querySelectorAll('[data-record]').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          const payment = payments.find((p) => String(p.id) === btn.dataset.record);
+          this.showRecordPaymentModal(payment);
         })
       );
     }
+  },
+
+  showRecordPaymentModal(payment) {
+    Util.openModal(`
+      <h3>Record Payment</h3>
+      <p class="text-muted">${Util.escapeHtml(payment.member_name)} — ${Util.monthName(payment.month)} ${payment.year}</p>
+      <form id="recordPaymentForm" style="text-align:left;">
+        <div class="field"><label>Amount Paid</label><input id="rp_amount" type="number" step="0.01" min="0" required value="${payment.amount_due}" /></div>
+        <div class="field"><label>Payment Date</label><input id="rp_date" type="date" required value="${Util.todayISO()}" /></div>
+        <p class="text-muted" style="font-size:0.8rem;">Use this for cash or bank-transfer payments collected outside the app. Enter less than the full amount to record a partial payment.</p>
+        <div class="toolbar close-modal mt-16" style="justify-content:center;">
+          <button type="submit">Save</button>
+          <button type="button" class="secondary" id="closeRecordModalBtn">Cancel</button>
+        </div>
+      </form>
+    `);
+    document.getElementById('closeRecordModalBtn').addEventListener('click', () => Util.closeModal());
+    document.getElementById('recordPaymentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amountPaid = Number(document.getElementById('rp_amount').value);
+      const paidDate = document.getElementById('rp_date').value;
+      if (!paidDate || amountPaid < 0) return;
+      const status = amountPaid >= Number(payment.amount_due) ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
+      try {
+        await Api.put(`/maintenance/payments/${payment.id}`, { amount_paid: amountPaid, status, paid_date: paidDate });
+        Util.closeModal();
+        await this.loadDues();
+        this.showAlert('Payment recorded.', 'success');
+      } catch (err) {
+        this.showAlert(err.message);
+      }
+    });
   },
 
   async showPayModal(payment) {
