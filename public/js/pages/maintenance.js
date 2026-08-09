@@ -90,7 +90,10 @@ window.MaintenancePage = {
     const user = Api.getUser();
     const isAdmin = user.role === 'admin';
     const filter = this.state.statusFilter;
-    const payments = filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter);
+    const statusRank = { paid: 0, partial: 1, unpaid: 2 };
+    const payments = (filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter))
+      .slice()
+      .sort((a, b) => statusRank[a.status] - statusRank[b.status]);
 
     const rows = document.getElementById('paymentRows');
     if (!payments.length) {
