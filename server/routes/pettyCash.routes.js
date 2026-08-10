@@ -58,6 +58,40 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   res.status(201).json({ transaction: row, summary: computeSummary() });
 });
 
+// Type is fixed on edit (flipping topup<->expense would require creating/removing the linked
+// expense row); amount/date/description/category can be corrected, and stay in sync with the
+// linked expenses row if this transaction is a petty-cash expense.
+router.put('/:id', requireAuth, requireAdmin, (req, res) => {
+  const existing = db.prepare('SELECT * FROM petty_cash_transactions WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Transaction not found' });
+  const { amount, txn_date, description, category } = req.body || {};
+  if (amount !== undefined && (!amount || amount <= 0)) {
+    return res.status(400).json({ error: 'A valid amount is required' });
+  }
+  const finalAmount = amount ?? existing.amount;
+  const finalDate = txn_date || existing.txn_date;
+  const finalDescription = description !== undefined && description.trim() ? description.trim() : existing.description;
+  const finalCategory = category !== undefined ? category || null : existing.category;
+
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE petty_cash_transactions SET amount = ?, txn_date = ?, description = ?, category = ? WHERE id = ?`
+    ).run(finalAmount, finalDate, finalDescription, finalCategory, req.params.id);
+    if (existing.expense_id) {
+      db.prepare('UPDATE expenses SET title = ?, category = ?, amount = ?, expense_date = ? WHERE id = ?').run(
+        finalDescription,
+        finalCategory || 'Petty Cash',
+        finalAmount,
+        finalDate,
+        existing.expense_id
+      );
+    }
+  })();
+
+  const row = db.prepare('SELECT * FROM petty_cash_transactions WHERE id = ?').get(req.params.id);
+  res.json({ transaction: row, summary: computeSummary() });
+});
+
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM petty_cash_transactions WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Transaction not found' });

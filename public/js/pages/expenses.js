@@ -1,4 +1,7 @@
 window.ExpensesPage = {
+  currentExpenses: [],
+  currentTransactions: [],
+
   async render(container) {
     const user = Api.getUser();
     const isAdmin = user.role === 'admin';
@@ -42,18 +45,23 @@ window.ExpensesPage = {
     if (box) box.innerHTML = `<div class="alert ${type}">${Util.escapeHtml(message)}</div>`;
   },
 
-  renderExpenseForm() {
+  renderExpenseForm(expense) {
+    const isEdit = !!expense;
     const el = document.getElementById('expenseForm');
     el.innerHTML = `
+      <div class="panel-header"><h3>${isEdit ? 'Edit Expense' : 'Add Expense'}</h3></div>
       <form id="expForm">
         <div class="form-grid">
-          <div class="field"><label>Title</label><input id="e_title" required /></div>
-          <div class="field"><label>Category</label><input id="e_category" placeholder="Cleaning, Security, Repairs..." /></div>
-          <div class="field"><label>Amount</label><input id="e_amount" type="number" step="0.01" required /></div>
-          <div class="field"><label>Date</label><input id="e_date" type="date" value="${Util.todayISO()}" /></div>
+          <div class="field"><label>Title</label><input id="e_title" required value="${Util.escapeHtml(expense?.title || '')}" /></div>
+          <div class="field"><label>Category</label><input id="e_category" placeholder="Cleaning, Security, Repairs..." value="${Util.escapeHtml(expense?.category || '')}" /></div>
+          <div class="field"><label>Amount</label><input id="e_amount" type="number" step="0.01" required value="${expense?.amount ?? ''}" /></div>
+          <div class="field"><label>Date</label><input id="e_date" type="date" value="${expense?.expense_date || Util.todayISO()}" /></div>
         </div>
-        <div class="field"><label>Notes</label><input id="e_notes" /></div>
-        <div class="toolbar mt-16"><button type="submit">Add Expense</button></div>
+        <div class="field"><label>Notes</label><input id="e_notes" value="${Util.escapeHtml(expense?.notes || '')}" /></div>
+        <div class="toolbar mt-16">
+          <button type="submit">${isEdit ? 'Save Changes' : 'Add Expense'}</button>
+          ${isEdit ? '<button type="button" class="secondary" id="cancelExpenseEdit">Cancel</button>' : ''}
+        </div>
       </form>
     `;
     document.getElementById('expForm').addEventListener('submit', async (e) => {
@@ -66,21 +74,28 @@ window.ExpensesPage = {
         notes: document.getElementById('e_notes').value.trim(),
       };
       try {
-        await Api.post('/expenses', payload);
-        e.target.reset();
-        document.getElementById('e_date').value = Util.todayISO();
+        if (isEdit) {
+          await Api.put(`/expenses/${expense.id}`, payload);
+        } else {
+          await Api.post('/expenses', payload);
+        }
+        this.renderExpenseForm();
         await this.loadExpenses();
-        this.showAlert('Expense added.', 'success');
+        this.showAlert(isEdit ? 'Expense updated.' : 'Expense added.', 'success');
       } catch (err) {
         this.showAlert(err.message);
       }
     });
+    if (isEdit) {
+      document.getElementById('cancelExpenseEdit').addEventListener('click', () => this.renderExpenseForm());
+    }
   },
 
   async loadExpenses() {
     const user = Api.getUser();
     const isAdmin = user.role === 'admin';
     const expenses = await Api.get('/expenses');
+    this.currentExpenses = expenses;
     const rows = document.getElementById('expenseRows');
     if (!expenses.length) {
       rows.innerHTML = `<tr class="empty-row"><td colspan="7">No expenses recorded</td></tr>`;
@@ -96,12 +111,27 @@ window.ExpensesPage = {
         <td>${Util.money(ex.amount)}</td>
         <td><span class="badge ${ex.source === 'petty_cash' ? 'partial' : 'active'}">${ex.source === 'petty_cash' ? 'Petty Cash' : 'Bank'}</span></td>
         <td>${Util.escapeHtml(ex.notes || '-')}</td>
-        ${isAdmin ? `<td>${ex.source === 'petty_cash' ? '<span class="text-muted" style="font-size:0.8rem;">via Petty Cash</span>' : `<button class="small danger" data-del="${ex.id}">Delete</button>`}</td>` : ''}
+        ${
+          isAdmin
+            ? `<td class="toolbar">${
+                ex.source === 'petty_cash'
+                  ? '<span class="text-muted" style="font-size:0.8rem;">via Petty Cash</span>'
+                  : `<button class="small secondary" data-edit="${ex.id}">Edit</button><button class="small danger" data-del="${ex.id}">Delete</button>`
+              }</td>`
+            : ''
+        }
       </tr>`
       )
       .join('');
 
     if (isAdmin) {
+      rows.querySelectorAll('[data-edit]').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          const expense = this.currentExpenses.find((x) => String(x.id) === btn.dataset.edit);
+          this.renderExpenseForm(expense);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+      );
       rows.querySelectorAll('[data-del]').forEach((btn) =>
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this expense?')) return;
@@ -116,53 +146,69 @@ window.ExpensesPage = {
     }
   },
 
-  renderPettyCashForm() {
+  renderPettyCashForm(txn) {
+    const isEdit = !!txn;
     const el = document.getElementById('pettyCashForm');
     el.innerHTML = `
+      <div class="panel-header"><h3>${isEdit ? 'Edit Petty Cash Transaction' : 'Add Petty Cash Transaction'}</h3></div>
       <form id="pcForm">
         <div class="form-grid">
           <div class="field"><label>Type</label>
-            <select id="pc_type">
-              <option value="expense">Expense (spend from petty cash)</option>
-              <option value="topup">Top-up (add cash from bank)</option>
+            <select id="pc_type" ${isEdit ? 'disabled' : ''}>
+              <option value="expense" ${!isEdit || txn.type === 'expense' ? 'selected' : ''}>Expense (spend from petty cash)</option>
+              <option value="topup" ${isEdit && txn.type === 'topup' ? 'selected' : ''}>Top-up (add cash from bank)</option>
             </select>
           </div>
-          <div class="field"><label>Amount</label><input id="pc_amount" type="number" step="0.01" required /></div>
-          <div class="field"><label>Date</label><input id="pc_date" type="date" value="${Util.todayISO()}" /></div>
-          <div class="field" id="pc_category_field"><label>Category</label><input id="pc_category" placeholder="Stationery, Tea, Misc..." /></div>
+          <div class="field"><label>Amount</label><input id="pc_amount" type="number" step="0.01" required value="${txn?.amount ?? ''}" /></div>
+          <div class="field"><label>Date</label><input id="pc_date" type="date" value="${txn?.txn_date || Util.todayISO()}" /></div>
+          <div class="field" id="pc_category_field"><label>Category</label><input id="pc_category" placeholder="Stationery, Tea, Misc..." value="${Util.escapeHtml(txn?.category || '')}" /></div>
         </div>
-        <div class="field"><label>Description</label><input id="pc_description" required /></div>
-        <div class="toolbar mt-16"><button type="submit">Add Transaction</button></div>
+        <div class="field"><label>Description</label><input id="pc_description" required value="${Util.escapeHtml(txn?.description || '')}" /></div>
+        <div class="toolbar mt-16">
+          <button type="submit">${isEdit ? 'Save Changes' : 'Add Transaction'}</button>
+          ${isEdit ? '<button type="button" class="secondary" id="cancelPcEdit">Cancel</button>' : ''}
+        </div>
       </form>
     `;
-    document.getElementById('pc_type').addEventListener('change', (e) => {
-      document.getElementById('pc_category_field').style.display = e.target.value === 'expense' ? '' : 'none';
+    const typeSelect = document.getElementById('pc_type');
+    const categoryField = document.getElementById('pc_category_field');
+    categoryField.style.display = typeSelect.value === 'expense' ? '' : 'none';
+    typeSelect.addEventListener('change', (e) => {
+      categoryField.style.display = e.target.value === 'expense' ? '' : 'none';
     });
     document.getElementById('pcForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
-        type: document.getElementById('pc_type').value,
+        type: typeSelect.value,
         amount: Number(document.getElementById('pc_amount').value),
         txn_date: document.getElementById('pc_date').value,
         description: document.getElementById('pc_description').value.trim(),
         category: document.getElementById('pc_category').value.trim(),
       };
       try {
-        await Api.post('/petty-cash', payload);
-        e.target.reset();
-        document.getElementById('pc_date').value = Util.todayISO();
+        if (isEdit) {
+          await Api.put(`/petty-cash/${txn.id}`, payload);
+        } else {
+          await Api.post('/petty-cash', payload);
+        }
+        this.renderPettyCashForm();
+        e.target.reset?.();
         await Promise.all([this.loadPettyCash(), this.loadExpenses()]);
-        this.showAlert('Petty cash transaction recorded.', 'success');
+        this.showAlert(isEdit ? 'Transaction updated.' : 'Petty cash transaction recorded.', 'success');
       } catch (err) {
         this.showAlert(err.message);
       }
     });
+    if (isEdit) {
+      document.getElementById('cancelPcEdit').addEventListener('click', () => this.renderPettyCashForm());
+    }
   },
 
   async loadPettyCash() {
     const user = Api.getUser();
     const isAdmin = user.role === 'admin';
     const { transactions, summary } = await Api.get('/petty-cash');
+    this.currentTransactions = transactions;
 
     const statsEl = document.getElementById('pettyCashStats');
     statsEl.innerHTML = `
@@ -185,12 +231,23 @@ window.ExpensesPage = {
         <td>${Util.escapeHtml(t.description)}</td>
         <td>${Util.escapeHtml(t.category || '-')}</td>
         <td>${t.type === 'topup' ? '+' : '-'}${Util.money(t.amount)}</td>
-        ${isAdmin ? `<td><button class="small danger" data-pc-del="${t.id}">Delete</button></td>` : ''}
+        ${
+          isAdmin
+            ? `<td class="toolbar"><button class="small secondary" data-pc-edit="${t.id}">Edit</button><button class="small danger" data-pc-del="${t.id}">Delete</button></td>`
+            : ''
+        }
       </tr>`
       )
       .join('');
 
     if (isAdmin) {
+      rows.querySelectorAll('[data-pc-edit]').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          const txn = this.currentTransactions.find((x) => String(x.id) === btn.dataset.pcEdit);
+          this.renderPettyCashForm(txn);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+      );
       rows.querySelectorAll('[data-pc-del]').forEach((btn) =>
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this petty cash transaction? Any linked expense entry will be removed too.')) return;
