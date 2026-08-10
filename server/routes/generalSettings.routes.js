@@ -5,10 +5,10 @@ const { sendMail } = require('../utils/mailer');
 
 const router = express.Router();
 
-// smtp_password must never leave the server - only expose whether SMTP is set up
+// resend_api_key must never leave the server - only expose whether email sending is set up
 function toPublicSettings(row) {
-  const { smtp_password, ...safe } = row;
-  return { ...safe, smtp_configured: !!(row.smtp_host && row.smtp_user && smtp_password) };
+  const { resend_api_key, ...safe } = row;
+  return { ...safe, email_configured: !!resend_api_key };
 }
 
 router.get('/', requireAuth, (req, res) => {
@@ -26,11 +26,8 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
     office_address,
     office_hours,
     phone_number,
-    smtp_host,
-    smtp_port,
-    smtp_user,
-    smtp_password,
-    smtp_from_email,
+    resend_api_key,
+    resend_from_email,
   } = req.body || {};
   if (maintenance_amount === undefined || Number(maintenance_amount) <= 0) {
     return res.status(400).json({ error: 'A valid maintenance amount is required' });
@@ -40,7 +37,7 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
     `UPDATE general_settings SET
        maintenance_amount = ?, opening_bank_balance = ?, opening_petty_cash_balance = ?,
        app_name = ?, contact_email = ?, office_address = ?, office_hours = ?, phone_number = ?,
-       smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_password = ?, smtp_from_email = ?,
+       resend_api_key = ?, resend_from_email = ?,
        updated_at = datetime('now')
      WHERE id = 1`
   ).run(
@@ -52,12 +49,9 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
     office_address !== undefined ? office_address || null : existing.office_address,
     office_hours !== undefined ? office_hours || null : existing.office_hours,
     phone_number !== undefined ? phone_number || null : existing.phone_number,
-    smtp_host !== undefined ? smtp_host || null : existing.smtp_host,
-    smtp_port !== undefined ? Number(smtp_port) || null : existing.smtp_port,
-    smtp_user !== undefined ? smtp_user || null : existing.smtp_user,
-    // blank/omitted password keeps the existing one, so admins don't have to re-enter it every save
-    smtp_password ? smtp_password : existing.smtp_password,
-    smtp_from_email !== undefined ? smtp_from_email || null : existing.smtp_from_email
+    // blank/omitted key keeps the existing one, so admins don't have to re-enter it every save
+    resend_api_key ? resend_api_key : existing.resend_api_key,
+    resend_from_email !== undefined ? resend_from_email || null : existing.resend_from_email
   );
   const row = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
   res.json(toPublicSettings(row));
@@ -71,7 +65,7 @@ router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
     await sendMail({
       to,
       subject: 'SBMN App - Test Email',
-      html: '<p>This is a test email from your SBMN app\'s General Settings. If you received this, SMTP is working correctly.</p>',
+      html: '<p>This is a test email from your SBMN app\'s General Settings. If you received this, email sending is working correctly.</p>',
     });
     res.json({ ok: true, to });
   } catch (err) {

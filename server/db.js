@@ -151,25 +151,24 @@ if (!generalSettingsColumns.includes('opening_petty_cash_balance')) {
   db.exec('ALTER TABLE general_settings ADD COLUMN opening_petty_cash_balance REAL NOT NULL DEFAULT 0');
 }
 
-// Migration: association profile + SMTP settings (for payment notification emails)
-[
-  'app_name',
-  'contact_email',
-  'office_address',
-  'office_hours',
-  'phone_number',
-  'smtp_host',
-  'smtp_user',
-  'smtp_password',
-  'smtp_from_email',
-].forEach((col) => {
+// Migration: association profile fields (for payment notification emails + public site display)
+['app_name', 'contact_email', 'office_address', 'office_hours', 'phone_number'].forEach((col) => {
   if (!generalSettingsColumns.includes(col)) {
     db.exec(`ALTER TABLE general_settings ADD COLUMN ${col} TEXT`);
   }
 });
-if (!generalSettingsColumns.includes('smtp_port')) {
-  db.exec('ALTER TABLE general_settings ADD COLUMN smtp_port INTEGER');
-}
+
+// Migration: email sending via Resend's HTTPS API (raw SMTP is blocked on Railway's Hobby plan)
+['smtp_host', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_from_email'].forEach((col) => {
+  if (generalSettingsColumns.includes(col)) {
+    db.exec(`ALTER TABLE general_settings DROP COLUMN ${col}`);
+  }
+});
+['resend_api_key', 'resend_from_email'].forEach((col) => {
+  if (!generalSettingsColumns.includes(col)) {
+    db.exec(`ALTER TABLE general_settings ADD COLUMN ${col} TEXT`);
+  }
+});
 if (generalSettingsColumns.includes('reminders_last_sent')) {
   db.exec('ALTER TABLE general_settings DROP COLUMN reminders_last_sent');
 }

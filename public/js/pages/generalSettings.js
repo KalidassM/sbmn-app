@@ -14,7 +14,7 @@ window.GeneralSettingsPage = {
           <div class="field"><label>Office Hours</label><input id="officeHours" placeholder="e.g. Every Sunday, 5 PM - 6 PM" /></div>
         </div>
         <div class="field"><label>Office Address</label><input id="officeAddress" placeholder="Street, area, city, PIN" /></div>
-        <p class="text-muted" style="font-size:0.85rem;">Contact Email also receives an email notification whenever a member's maintenance payment is recorded (see SMTP Settings below).</p>
+        <p class="text-muted" style="font-size:0.85rem;">Contact Email also receives an email notification whenever a member's maintenance payment is recorded (see Email Settings below).</p>
 
         <div class="panel-header" style="margin-top:20px;"><h3>Monthly Maintenance</h3></div>
         <div class="form-grid">
@@ -29,15 +29,12 @@ window.GeneralSettingsPage = {
         </div>
         <p class="text-muted" style="font-size:0.85rem;">Money already sitting in the bank account or petty cash box before this system started recording transactions. Added into the Dashboard's Net Balance and the Petty Cash page's Cash in Hand figure.</p>
 
-        <div class="panel-header" style="margin-top:20px;"><h3>SMTP Settings <span id="smtpBadge"></span></h3></div>
+        <div class="panel-header" style="margin-top:20px;"><h3>Email Settings (Resend) <span id="emailBadge"></span></h3></div>
         <div class="form-grid">
-          <div class="field"><label>SMTP Host</label><input id="smtpHost" placeholder="e.g. smtp.gmail.com" /></div>
-          <div class="field"><label>SMTP Port</label><input id="smtpPort" type="number" placeholder="587 or 465" /></div>
-          <div class="field"><label>SMTP Username</label><input id="smtpUser" placeholder="usually your full email address" /></div>
-          <div class="field"><label>SMTP Password</label><input id="smtpPassword" type="password" placeholder="leave blank to keep current" /></div>
+          <div class="field"><label>Resend API Key</label><input id="resendApiKey" type="password" placeholder="leave blank to keep current" /></div>
+          <div class="field"><label>From Email</label><input id="resendFromEmail" type="email" placeholder="onboarding@resend.dev" /></div>
         </div>
-        <div class="field"><label>From Email (optional, defaults to username)</label><input id="smtpFromEmail" type="email" /></div>
-        <p class="text-muted" style="font-size:0.85rem;">Used to send the payment-received notification above. Most providers (Gmail, Zoho, Outlook) require an app-specific password, not your normal login password.</p>
+        <p class="text-muted" style="font-size:0.85rem;">Used to send the payment-received notification above, via <a href="https://resend.com" target="_blank">Resend</a>'s free tier. Get an API key from resend.com/api-keys. Leave From Email blank to use Resend's shared sandbox sender (<code>onboarding@resend.dev</code>) &mdash; no domain setup needed to get started; verify your own domain in Resend later if you want to send from your association's own address.</p>
 
         <div class="toolbar mt-16">
           <button type="submit">Save</button>
@@ -56,11 +53,8 @@ window.GeneralSettingsPage = {
     document.getElementById('maintenanceAmount').value = settings.maintenance_amount || '';
     document.getElementById('openingBankBalance').value = settings.opening_bank_balance || 0;
     document.getElementById('openingPettyCashBalance').value = settings.opening_petty_cash_balance || 0;
-    document.getElementById('smtpHost').value = settings.smtp_host || '';
-    document.getElementById('smtpPort').value = settings.smtp_port || '';
-    document.getElementById('smtpUser').value = settings.smtp_user || '';
-    document.getElementById('smtpFromEmail').value = settings.smtp_from_email || '';
-    document.getElementById('smtpBadge').innerHTML = settings.smtp_configured
+    document.getElementById('resendFromEmail').value = settings.resend_from_email || '';
+    document.getElementById('emailBadge').innerHTML = settings.email_configured
       ? '<span class="badge active">configured</span>'
       : '<span class="badge unpaid">not configured</span>';
 
@@ -76,11 +70,8 @@ window.GeneralSettingsPage = {
           phone_number: document.getElementById('phoneNumber').value.trim(),
           office_hours: document.getElementById('officeHours').value.trim(),
           office_address: document.getElementById('officeAddress').value.trim(),
-          smtp_host: document.getElementById('smtpHost').value.trim(),
-          smtp_port: document.getElementById('smtpPort').value ? Number(document.getElementById('smtpPort').value) : null,
-          smtp_user: document.getElementById('smtpUser').value.trim(),
-          smtp_password: document.getElementById('smtpPassword').value,
-          smtp_from_email: document.getElementById('smtpFromEmail').value.trim(),
+          resend_api_key: document.getElementById('resendApiKey').value,
+          resend_from_email: document.getElementById('resendFromEmail').value.trim(),
         });
         this.showAlert('Saved.', 'success');
         this.render(container);
