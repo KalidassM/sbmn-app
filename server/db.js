@@ -173,6 +173,21 @@ if (generalSettingsColumns.includes('reminders_last_sent')) {
   db.exec('ALTER TABLE general_settings DROP COLUMN reminders_last_sent');
 }
 
+// Migration: track the last calendar date (YYYY-MM-DD, India time) automated WhatsApp reminders
+// went out, so the daily scheduler check never double-sends on the same day
+if (!generalSettingsColumns.includes('reminders_last_sent_date')) {
+  db.exec('ALTER TABLE general_settings ADD COLUMN reminders_last_sent_date TEXT');
+}
+
+// Migration: admin-configurable reminder schedule (comma-separated days of month + a HH:MM time,
+// both interpreted in India time) instead of a hardcoded day list
+if (!generalSettingsColumns.includes('reminder_days')) {
+  db.exec("ALTER TABLE general_settings ADD COLUMN reminder_days TEXT NOT NULL DEFAULT '1,2,3,4,5,7,10'");
+}
+if (!generalSettingsColumns.includes('reminder_time')) {
+  db.exec("ALTER TABLE general_settings ADD COLUMN reminder_time TEXT NOT NULL DEFAULT '10:00'");
+}
+
 // Migration: add site_no to members if the table pre-dates this column
 const memberColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
 if (!memberColumns.includes('site_no')) {
@@ -201,6 +216,14 @@ if (!maintenancePaymentColumns.includes('payment_mode')) {
 }
 if (!maintenancePaymentColumns.includes('reference_no')) {
   db.exec('ALTER TABLE maintenance_payments ADD COLUMN reference_no TEXT');
+}
+
+// Migration: track the last automated WhatsApp reminder attempt per due, for the admin Reminders page
+if (!maintenancePaymentColumns.includes('last_reminder_sent_at')) {
+  db.exec('ALTER TABLE maintenance_payments ADD COLUMN last_reminder_sent_at TEXT');
+}
+if (!maintenancePaymentColumns.includes('last_reminder_error')) {
+  db.exec('ALTER TABLE maintenance_payments ADD COLUMN last_reminder_error TEXT');
 }
 
 // Migration: mark existing expenses as bank-sourced now that petty cash is a second source

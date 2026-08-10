@@ -28,16 +28,37 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
     phone_number,
     resend_api_key,
     resend_from_email,
+    reminder_days,
+    reminder_time,
   } = req.body || {};
   if (maintenance_amount === undefined || Number(maintenance_amount) <= 0) {
     return res.status(400).json({ error: 'A valid maintenance amount is required' });
   }
   const existing = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
+
+  let finalReminderDays = existing.reminder_days;
+  if (reminder_days !== undefined) {
+    const days = String(reminder_days)
+      .split(',')
+      .map((d) => Number(d.trim()))
+      .filter((d) => Number.isInteger(d) && d >= 1 && d <= 31);
+    if (!days.length) return res.status(400).json({ error: 'Pick at least one reminder day' });
+    finalReminderDays = [...new Set(days)].sort((a, b) => a - b).join(',');
+  }
+
+  let finalReminderTime = existing.reminder_time;
+  if (reminder_time !== undefined) {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
+      return res.status(400).json({ error: 'Reminder time must be in HH:MM format' });
+    }
+    finalReminderTime = reminder_time;
+  }
+
   db.prepare(
     `UPDATE general_settings SET
        maintenance_amount = ?, opening_bank_balance = ?, opening_petty_cash_balance = ?,
        app_name = ?, contact_email = ?, office_address = ?, office_hours = ?, phone_number = ?,
-       resend_api_key = ?, resend_from_email = ?,
+       resend_api_key = ?, resend_from_email = ?, reminder_days = ?, reminder_time = ?,
        updated_at = datetime('now')
      WHERE id = 1`
   ).run(
@@ -51,7 +72,9 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
     phone_number !== undefined ? phone_number || null : existing.phone_number,
     // blank/omitted key keeps the existing one, so admins don't have to re-enter it every save
     resend_api_key ? resend_api_key : existing.resend_api_key,
-    resend_from_email !== undefined ? resend_from_email || null : existing.resend_from_email
+    resend_from_email !== undefined ? resend_from_email || null : existing.resend_from_email,
+    finalReminderDays,
+    finalReminderTime
   );
   const row = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
   res.json(toPublicSettings(row));

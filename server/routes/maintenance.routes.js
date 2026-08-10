@@ -3,6 +3,7 @@ const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
 const { notifyAdminOfPayment } = require('../utils/paymentNotify');
+const { sendDailyReminders } = require('../utils/maintenanceReminders');
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ router.get('/payments', requireAuth, (req, res) => {
     ensureDuesGenerated(Number(month), Number(year));
   }
 
-  let sql = `SELECT mp.*, m.name AS member_name, m.site_no FROM maintenance_payments mp
+  let sql = `SELECT mp.*, m.name AS member_name, m.site_no, m.phone FROM maintenance_payments mp
              JOIN members m ON m.id = mp.member_id`;
   const clauses = [];
   const params = [];
@@ -31,6 +32,38 @@ router.get('/payments', requireAuth, (req, res) => {
   if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
   sql += ' ORDER BY mp.year DESC, mp.month DESC, m.name';
   res.json(db.prepare(sql).all(...params));
+});
+
+// Admin-only view of who still owes for a month and whether the automated WhatsApp reminder
+// reached them - pre-filtered server-side (unlike /payments) since it's built to surface phone
+// numbers + delivery errors in bulk, which only the admin should see.
+router.get('/reminders', requireAuth, requireAdmin, (req, res) => {
+  const month = Number(req.query.month) || new Date().getMonth() + 1;
+  const year = Number(req.query.year) || new Date().getFullYear();
+  ensureDuesGenerated(month, year);
+
+  const rows = db
+    .prepare(
+      `SELECT mp.id, mp.amount_due, mp.amount_paid, mp.status, mp.last_reminder_sent_at, mp.last_reminder_error,
+              m.name AS member_name, m.site_no, m.phone
+       FROM maintenance_payments mp
+       JOIN members m ON m.id = mp.member_id
+       WHERE mp.month = ? AND mp.year = ? AND mp.status != 'paid'
+       ORDER BY m.name`
+    )
+    .all(month, year);
+  res.json(rows);
+});
+
+// Manually re-runs today's reminder send, bypassing the day/time/already-sent guards - for
+// testing a schedule change or re-notifying stragglers without waiting for tomorrow.
+router.post('/reminders/resend-today', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await sendDailyReminders({ force: true });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {

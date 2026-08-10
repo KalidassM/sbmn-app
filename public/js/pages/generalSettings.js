@@ -22,6 +22,24 @@ window.GeneralSettingsPage = {
         </div>
         <p class="text-muted" style="font-size:0.85rem;">Applied automatically each month to generate maintenance dues for every active member — no manual step needed on the Maintenance page.</p>
 
+        <div class="panel-header" style="margin-top:20px;"><h3>Reminder Schedule</h3></div>
+        <div class="field"><label>Days of the month to send WhatsApp reminders on</label>
+          <div id="reminderDaysGrid" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;max-width:420px;">
+            ${Array.from({ length: 31 }, (_, i) => i + 1)
+              .map(
+                (d) => `
+              <label style="display:flex;align-items:center;gap:4px;font-weight:normal;font-size:0.85rem;">
+                <input type="checkbox" class="reminderDay" value="${d}" /> ${d}
+              </label>`
+              )
+              .join('')}
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>Time to send (IST)</label><input id="reminderTime" type="time" required /></div>
+        </div>
+        <p class="text-muted" style="font-size:0.85rem;">On each checked day, once this time passes (India time), every member with an unpaid due for that month gets a WhatsApp reminder automatically — see the WhatsApp Reminders section below to link the account it sends from.</p>
+
         <div class="panel-header" style="margin-top:20px;"><h3>Opening Balances</h3></div>
         <div class="form-grid">
           <div class="field"><label>Opening Bank Balance (₹, before digital tracking started)</label><input id="openingBankBalance" type="number" step="0.01" min="0" /></div>
@@ -42,6 +60,16 @@ window.GeneralSettingsPage = {
         </div>
         </form>
       </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3>WhatsApp Reminders <span id="waBadge"></span></h3></div>
+        <p class="text-muted" style="font-size:0.85rem;">
+          Automatically sends a WhatsApp reminder to every member with an unpaid due, on the days/time set under Reminder Schedule above.
+          This links your own WhatsApp account (like WhatsApp Web) rather than using WhatsApp's official Business API &mdash;
+          simpler to set up, but it's against WhatsApp's terms for automated messaging and carries a real risk of the linked number being flagged or banned.
+        </p>
+        <div id="waContent"></div>
+      </div>
     `;
 
     const settings = await Api.get('/general-settings');
@@ -57,9 +85,19 @@ window.GeneralSettingsPage = {
     document.getElementById('emailBadge').innerHTML = settings.email_configured
       ? '<span class="badge active">configured</span>'
       : '<span class="badge unpaid">not configured</span>';
+    document.getElementById('reminderTime').value = settings.reminder_time || '10:00';
+    const selectedDays = new Set((settings.reminder_days || '1,2,3,4,5,7,10').split(',').map((d) => d.trim()));
+    document.querySelectorAll('.reminderDay').forEach((cb) => {
+      cb.checked = selectedDays.has(cb.value);
+    });
 
     document.getElementById('settingsForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const reminderDays = Array.from(document.querySelectorAll('.reminderDay:checked')).map((cb) => cb.value);
+      if (!reminderDays.length) {
+        this.showAlert('Pick at least one reminder day');
+        return;
+      }
       try {
         await Api.put('/general-settings', {
           maintenance_amount: Number(document.getElementById('maintenanceAmount').value),
@@ -72,6 +110,8 @@ window.GeneralSettingsPage = {
           office_address: document.getElementById('officeAddress').value.trim(),
           resend_api_key: document.getElementById('resendApiKey').value,
           resend_from_email: document.getElementById('resendFromEmail').value.trim(),
+          reminder_days: reminderDays.join(','),
+          reminder_time: document.getElementById('reminderTime').value,
         });
         this.showAlert('Saved.', 'success');
         this.render(container);
@@ -92,6 +132,73 @@ window.GeneralSettingsPage = {
         btn.disabled = false;
       }
     });
+
+    this.pollWhatsAppStatus();
+  },
+
+  clearWhatsAppPoll() {
+    if (this.waPollTimer) clearTimeout(this.waPollTimer);
+    this.waPollTimer = null;
+  },
+
+  async pollWhatsAppStatus() {
+    this.clearWhatsAppPoll();
+    const badge = document.getElementById('waBadge');
+    const content = document.getElementById('waContent');
+    if (!badge || !content) return; // navigated away
+
+    let result;
+    try {
+      result = await Api.get('/whatsapp/status');
+    } catch (err) {
+      content.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
+      return;
+    }
+
+    if (result.status === 'connected') {
+      badge.innerHTML = '<span class="badge active">connected</span>';
+      content.innerHTML = `
+        <p class="text-muted" style="font-size:0.85rem;">Linked and ready. Reminders will send automatically on the scheduled days.</p>
+        <div class="toolbar">
+          <input type="tel" id="waTestPhone" placeholder="Test phone number, e.g. 9876543210" style="max-width:240px;" />
+          <button type="button" class="secondary" id="waTestBtn">Send Test Message</button>
+          <button type="button" class="secondary" id="waLogoutBtn">Unlink WhatsApp</button>
+        </div>
+      `;
+      document.getElementById('waTestBtn').addEventListener('click', async () => {
+        const phone = document.getElementById('waTestPhone').value.trim();
+        if (!phone) return;
+        const btn = document.getElementById('waTestBtn');
+        btn.disabled = true;
+        try {
+          await Api.post('/whatsapp/test', { phone });
+          this.showAlert(`Test message sent to ${phone}.`, 'success');
+        } catch (err) {
+          this.showAlert(err.message);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+      document.getElementById('waLogoutBtn').addEventListener('click', async () => {
+        if (!confirm('Unlink WhatsApp? Automatic reminders will stop until you scan a new QR code.')) return;
+        await Api.post('/whatsapp/logout');
+        this.pollWhatsAppStatus();
+      });
+      return; // no need to keep polling once connected
+    }
+
+    if (result.status === 'qr' && result.qr) {
+      badge.innerHTML = '<span class="badge unpaid">scan to link</span>';
+      content.innerHTML = `
+        <p class="text-muted" style="font-size:0.85rem;">Open WhatsApp on the phone you want to send reminders from &rarr; Settings &rarr; Linked Devices &rarr; Link a Device, then scan this code.</p>
+        <img src="${result.qr}" alt="WhatsApp QR code" style="width:220px;height:220px;" />
+      `;
+    } else {
+      badge.innerHTML = '<span class="badge unpaid">not linked</span>';
+      content.innerHTML = `<p class="text-muted" style="font-size:0.85rem;">Connecting&hellip; a QR code will appear here shortly.</p>`;
+    }
+
+    this.waPollTimer = setTimeout(() => this.pollWhatsAppStatus(), 3000);
   },
 
   showAlert(message, type = 'error') {

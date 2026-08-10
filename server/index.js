@@ -23,6 +23,9 @@ const contactMessageRoutes = require('./routes/contactMessages.routes');
 const publicSiteRoutes = require('./routes/publicSite.routes');
 const publicMaintenanceRoutes = require('./routes/publicMaintenance.routes');
 const generalSettingsRoutes = require('./routes/generalSettings.routes');
+const whatsappRoutes = require('./routes/whatsapp.routes');
+const whatsapp = require('./utils/whatsappClient');
+const { sendDailyReminders } = require('./utils/maintenanceReminders');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,6 +51,7 @@ app.use('/api/contact-messages', contactMessageRoutes);
 app.use('/api/public/site', publicSiteRoutes);
 app.use('/api/public/maintenance', publicMaintenanceRoutes);
 app.use('/api/general-settings', generalSettingsRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -71,3 +75,22 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Sri Balamurugan Nagar Welfare Association app running at http://localhost:${PORT}`);
 });
+
+whatsapp.connect().catch((err) => console.error('WhatsApp connect failed:', err.message));
+
+// sendDailyReminders() is idempotent (guards on general_settings.reminders_last_sent_date), so a
+// frequent check is safe - no cron dependency needed, and it self-heals if the server restarts.
+// Checked every 5 minutes so the admin-configured reminder_time is honored fairly closely.
+async function checkDailyReminders() {
+  try {
+    const result = await sendDailyReminders();
+    if (!result.skipped) {
+      console.log(`Maintenance reminders (${result.dateKey}): sent ${result.sent.length}/${result.totalDue}, ${result.failed.length} failed, ${result.skippedNoPhone.length} skipped (no phone)`);
+    }
+  } catch (err) {
+    console.error('Daily reminder check failed:', err.message);
+  }
+}
+
+setInterval(checkDailyReminders, 5 * 60 * 1000);
+checkDailyReminders();

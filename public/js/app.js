@@ -42,6 +42,7 @@ const Util = {
 const NAV_ITEMS = [
   { path: '#/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
   { path: '#/maintenance', label: 'Maintenance', icon: 'bi-house-gear' },
+  { path: '#/reminders', label: 'Reminders', icon: 'bi-bell', adminOnly: true },
   { path: '#/expenses', label: 'Expenses & Petty Cash', icon: 'bi-cash-coin' },
   { path: '#/members', label: 'Members', icon: 'bi-people' },
   { path: '#/events', label: 'Events', icon: 'bi-calendar-event' },
@@ -59,6 +60,7 @@ const PAGES = {
   '#/core-members': window.CoreMembersPage,
   '#/events': window.EventsPage,
   '#/maintenance': window.MaintenancePage,
+  '#/reminders': window.RemindersPage,
   '#/expenses': window.ExpensesPage,
   '#/donations': window.DonationsPage,
   '#/contact-messages': window.ContactMessagesPage,
