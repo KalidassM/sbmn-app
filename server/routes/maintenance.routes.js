@@ -34,6 +34,25 @@ router.get('/payments', requireAuth, (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 
+// Marks a batch of dues fully paid in one action (e.g. cash collected from several members at
+// once) - skips any row already paid rather than erroring on it.
+router.post('/payments/bulk-mark-paid', requireAuth, requireAdmin, (req, res) => {
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids array is required' });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const update = db.prepare(
+    `UPDATE maintenance_payments SET amount_paid = amount_due, status = 'paid', paid_date = ? WHERE id = ? AND status != 'paid'`
+  );
+  let updated = 0;
+  db.transaction((rowIds) => {
+    rowIds.forEach((id) => {
+      updated += update.run(today, id).changes;
+    });
+  })(ids);
+  res.json({ updated });
+});
+
 // Admin-only view of who still owes for a month and whether the automated WhatsApp reminder
 // reached them - pre-filtered server-side (unlike /payments) since it's built to surface phone
 // numbers + delivery errors in bulk, which only the admin should see.

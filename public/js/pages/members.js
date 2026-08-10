@@ -1,5 +1,6 @@
 window.MembersPage = {
   editingId: null,
+  selectedIds: new Set(),
 
   async render(container) {
     const user = Api.getUser();
@@ -11,10 +12,23 @@ window.MembersPage = {
       ${isAdmin ? '<div class="panel" id="bulkPanel"></div>' : ''}
       ${isAdmin ? '<div class="panel" id="formPanel"></div>' : ''}
       <div class="panel">
-        <div class="panel-header"><h3>All Members</h3></div>
+        <div class="panel-header">
+          <h3>All Members</h3>
+          ${
+            isAdmin
+              ? `<div class="toolbar">
+                  <select id="bulkStatusSelect">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <button class="secondary" id="bulkStatusBtn">Apply to Selected</button>
+                </div>`
+              : ''
+          }
+        </div>
         <table>
-          <thead><tr><th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Joined</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="8">Loading…</td></tr></tbody>
+          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Joined</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="9">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -22,8 +36,31 @@ window.MembersPage = {
     if (isAdmin) {
       this.renderBulkPanel(document.getElementById('bulkPanel'));
       this.renderForm(document.getElementById('formPanel'), null);
+      document.getElementById('bulkStatusBtn').addEventListener('click', () => this.applyBulkStatus());
     }
+    this.selectedIds.clear();
     await this.loadRows();
+  },
+
+  async applyBulkStatus() {
+    if (!this.selectedIds.size) {
+      this.showAlert('Select one or more members first');
+      return;
+    }
+    const status = document.getElementById('bulkStatusSelect').value;
+    if (!confirm(`Set ${this.selectedIds.size} member(s) to "${status}"?`)) return;
+    const btn = document.getElementById('bulkStatusBtn');
+    btn.disabled = true;
+    try {
+      const result = await Api.put('/members/bulk-status', { ids: Array.from(this.selectedIds), status });
+      this.showAlert(`${result.updated} member(s) updated.`, 'success');
+      this.selectedIds.clear();
+      await this.loadRows();
+    } catch (err) {
+      this.showAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
   },
 
   renderBulkPanel(panel) {
@@ -135,13 +172,14 @@ window.MembersPage = {
     const members = await Api.get('/members');
     const rows = document.getElementById('rows');
     if (!members.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="8">No members yet</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No members yet</td></tr>`;
       return;
     }
     rows.innerHTML = members
       .map(
         (m) => `
       <tr>
+        ${isAdmin ? `<td><input type="checkbox" class="memberSelect" value="${m.id}" ${this.selectedIds.has(m.id) ? 'checked' : ''} /></td>` : ''}
         <td>${Util.escapeHtml(m.site_no || '-')}</td>
         <td>${Util.escapeHtml(m.name)}</td>
         <td>${Util.escapeHtml(m.phone || '-')}</td>
@@ -162,6 +200,27 @@ window.MembersPage = {
       .join('');
 
     if (isAdmin) {
+      rows.querySelectorAll('.memberSelect').forEach((cb) =>
+        cb.addEventListener('change', () => {
+          const id = Number(cb.value);
+          if (cb.checked) this.selectedIds.add(id);
+          else this.selectedIds.delete(id);
+          const selectAll = document.getElementById('selectAllMembers');
+          if (selectAll) selectAll.checked = rows.querySelectorAll('.memberSelect').length === rows.querySelectorAll('.memberSelect:checked').length;
+        })
+      );
+      const selectAll = document.getElementById('selectAllMembers');
+      if (selectAll) {
+        selectAll.checked = false;
+        selectAll.onchange = () => {
+          rows.querySelectorAll('.memberSelect').forEach((cb) => {
+            cb.checked = selectAll.checked;
+            const id = Number(cb.value);
+            if (selectAll.checked) this.selectedIds.add(id);
+            else this.selectedIds.delete(id);
+          });
+        };
+      }
       rows.querySelectorAll('[data-edit]').forEach((btn) =>
         btn.addEventListener('click', async () => {
           const member = members.find((m) => String(m.id) === btn.dataset.edit);

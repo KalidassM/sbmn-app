@@ -1,6 +1,7 @@
 window.MaintenancePage = {
   state: { month: new Date().getMonth() + 1, year: new Date().getFullYear(), statusFilter: 'all' },
   currentPayments: [],
+  selectedIds: new Set(),
 
   async render(container) {
     const user = Api.getUser();
@@ -26,11 +27,12 @@ window.MaintenancePage = {
               <option value="paid">Paid</option>
             </select>
             ${isAdmin ? '<button id="recordPaymentBtn">Record Payment</button>' : ''}
+            ${isAdmin ? '<button class="secondary" id="bulkMarkPaidBtn">Mark Selected as Paid</button>' : ''}
           </div>
         </div>
         <table>
-          <thead><tr><th>Site No</th><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Mode</th><th>Reference</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="paymentRows"><tr><td colspan="9">Loading…</td></tr></tbody>
+          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllRows" /></th>' : ''}<th>Site No</th><th>Member</th><th>Amount Due</th><th>Amount Paid</th><th>Paid Date</th><th>Mode</th><th>Reference</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="paymentRows"><tr><td colspan="10">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -52,6 +54,7 @@ window.MaintenancePage = {
 
     if (isAdmin) {
       document.getElementById('recordPaymentBtn').addEventListener('click', () => this.showRecordPaymentModal());
+      document.getElementById('bulkMarkPaidBtn').addEventListener('click', () => this.bulkMarkPaid());
     }
 
     await this.loadDues();
@@ -83,7 +86,27 @@ window.MaintenancePage = {
       payments = payments.filter((p) => p.member_id === user.member_id);
     }
     this.currentPayments = payments;
+    this.selectedIds.clear();
     this.renderRows();
+  },
+
+  async bulkMarkPaid() {
+    if (!this.selectedIds.size) {
+      this.showAlert('Select one or more unpaid/partial dues first');
+      return;
+    }
+    if (!confirm(`Mark ${this.selectedIds.size} due(s) as fully paid?`)) return;
+    const btn = document.getElementById('bulkMarkPaidBtn');
+    btn.disabled = true;
+    try {
+      const result = await Api.post('/maintenance/payments/bulk-mark-paid', { ids: Array.from(this.selectedIds) });
+      this.showAlert(`${result.updated} due(s) marked as paid.`, 'success');
+      await this.loadDues();
+    } catch (err) {
+      this.showAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
   },
 
   renderRows() {
@@ -97,13 +120,18 @@ window.MaintenancePage = {
 
     const rows = document.getElementById('paymentRows');
     if (!payments.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No dues match this view</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="10">No dues match this view</td></tr>`;
       return;
     }
     rows.innerHTML = payments
       .map(
         (p) => `
       <tr>
+        ${
+          isAdmin
+            ? `<td>${p.status !== 'paid' ? `<input type="checkbox" class="rowSelect" value="${p.id}" ${this.selectedIds.has(p.id) ? 'checked' : ''} />` : ''}</td>`
+            : ''
+        }
         <td>${Util.escapeHtml(p.site_no || '-')}</td>
         <td>${Util.escapeHtml(p.member_name)}</td>
         <td>${Util.money(p.amount_due)}</td>
@@ -142,6 +170,27 @@ window.MaintenancePage = {
           }
         })
       );
+      rows.querySelectorAll('.rowSelect').forEach((cb) =>
+        cb.addEventListener('change', () => {
+          const id = Number(cb.value);
+          if (cb.checked) this.selectedIds.add(id);
+          else this.selectedIds.delete(id);
+          const selectAll = document.getElementById('selectAllRows');
+          if (selectAll) selectAll.checked = rows.querySelectorAll('.rowSelect').length === rows.querySelectorAll('.rowSelect:checked').length;
+        })
+      );
+      const selectAll = document.getElementById('selectAllRows');
+      if (selectAll) {
+        selectAll.checked = false;
+        selectAll.onchange = () => {
+          rows.querySelectorAll('.rowSelect').forEach((cb) => {
+            cb.checked = selectAll.checked;
+            const id = Number(cb.value);
+            if (selectAll.checked) this.selectedIds.add(id);
+            else this.selectedIds.delete(id);
+          });
+        };
+      }
     }
   },
 

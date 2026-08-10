@@ -80,6 +80,22 @@ router.post('/bulk', requireAuth, requireAdmin, (req, res) => {
   res.json({ inserted, updated, skipped });
 });
 
+// Must be registered before PUT /:id, otherwise "bulk-status" would be captured as an :id value.
+router.put('/bulk-status', requireAuth, requireAdmin, (req, res) => {
+  const { ids, status } = req.body || {};
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids array is required' });
+  if (!['active', 'inactive'].includes(status)) return res.status(400).json({ error: 'status must be active or inactive' });
+
+  const update = db.prepare('UPDATE members SET status = ? WHERE id = ?');
+  let updated = 0;
+  db.transaction((rowIds) => {
+    rowIds.forEach((id) => {
+      updated += update.run(status, id).changes;
+    });
+  })(ids);
+  res.json({ updated });
+});
+
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Member not found' });
