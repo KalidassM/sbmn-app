@@ -18,16 +18,16 @@ router.get('/:id', requireAuth, (req, res) => {
 });
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
-  const { title, description, event_date, venue, budget } = req.body || {};
+  const { title, description, event_date, venue } = req.body || {};
   if (!title || !event_date) {
     return res.status(400).json({ error: 'title and event_date are required' });
   }
   const info = db
     .prepare(
-      `INSERT INTO events (title, description, event_date, venue, budget)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO events (title, description, event_date, venue)
+       VALUES (?, ?, ?, ?)`
     )
-    .run(title, description || null, event_date, venue || null, budget || 0);
+    .run(title, description || null, event_date, venue || null);
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json(event);
 });
@@ -35,15 +35,14 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Event not found' });
-  const { title, description, event_date, venue, budget } = req.body || {};
+  const { title, description, event_date, venue } = req.body || {};
   db.prepare(
-    `UPDATE events SET title = ?, description = ?, event_date = ?, venue = ?, budget = ? WHERE id = ?`
+    `UPDATE events SET title = ?, description = ?, event_date = ?, venue = ? WHERE id = ?`
   ).run(
     title ?? existing.title,
     description ?? existing.description,
     event_date ?? existing.event_date,
     venue ?? existing.venue,
-    budget ?? existing.budget,
     req.params.id
   );
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);

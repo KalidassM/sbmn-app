@@ -4,6 +4,11 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
+router.get('/', requireAuth, (req, res) => {
+  const notices = db.prepare('SELECT * FROM notices ORDER BY pinned DESC, created_at DESC').all();
+  res.json(notices);
+});
+
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   const { title, body, pinned } = req.body || {};
   if (!title || !body) {

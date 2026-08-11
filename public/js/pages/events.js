@@ -10,8 +10,8 @@ window.EventsPage = {
       <div class="panel">
         <div class="panel-header"><h3>All Events</h3></div>
         <table>
-          <thead><tr><th>Title</th><th>Date</th><th>Venue</th><th>Budget</th><th>Description</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
+          <thead><tr><th>Title</th><th>Date</th><th>Venue</th><th>Description</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="5">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -30,7 +30,7 @@ window.EventsPage = {
     const events = await Api.get('/events');
     const tbody = document.getElementById('rows');
     if (!events.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No events yet</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No events yet</td></tr>`;
       return;
     }
     tbody.innerHTML = events
@@ -40,7 +40,6 @@ window.EventsPage = {
         <td>${Util.escapeHtml(ev.title)}</td>
         <td>${ev.event_date}</td>
         <td>${Util.escapeHtml(ev.venue || '-')}</td>
-        <td>${Util.money(ev.budget)}</td>
         <td>${Util.escapeHtml(ev.description || '-')}</td>
         ${
           isAdmin
@@ -86,7 +85,6 @@ window.EventsPage = {
           <div class="field"><label>Title</label><input id="f_title" required value="${Util.escapeHtml(ev?.title || '')}" /></div>
           <div class="field"><label>Date</label><input id="f_date" type="date" required value="${ev?.event_date || Util.todayISO()}" /></div>
           <div class="field"><label>Venue</label><input id="f_venue" value="${Util.escapeHtml(ev?.venue || '')}" /></div>
-          <div class="field"><label>Budget</label><input id="f_budget" type="number" step="0.01" value="${ev?.budget ?? 0}" /></div>
         </div>
         <div class="field"><label>Description</label><textarea id="f_desc" rows="2">${Util.escapeHtml(ev?.description || '')}</textarea></div>
         <div class="toolbar mt-16">
@@ -102,7 +100,6 @@ window.EventsPage = {
         title: document.getElementById('f_title').value.trim(),
         event_date: document.getElementById('f_date').value,
         venue: document.getElementById('f_venue').value.trim(),
-        budget: Number(document.getElementById('f_budget').value) || 0,
         description: document.getElementById('f_desc').value.trim(),
       };
       try {
