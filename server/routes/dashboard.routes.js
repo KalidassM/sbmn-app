@@ -13,6 +13,7 @@ router.get('/summary', requireAuth, (req, res) => {
   const upcomingEvents = db
     .prepare("SELECT COUNT(*) AS c FROM events WHERE event_date >= date('now')")
     .get().c;
+  const noticeCount = db.prepare('SELECT COUNT(*) AS c FROM notices').get().c;
   const totalExpenses = db.prepare('SELECT COALESCE(SUM(amount), 0) AS s FROM expenses').get().s;
   const totalDonations = db
     .prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM donations WHERE status = 'completed'")
@@ -38,6 +39,7 @@ router.get('/summary', requireAuth, (req, res) => {
     inactiveMemberCount,
     coreMemberCount,
     upcomingEvents,
+    noticeCount,
     totalExpenses,
     totalDonations,
     totalMaintenanceCollected,

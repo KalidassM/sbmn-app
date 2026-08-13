@@ -24,6 +24,7 @@ window.DashboardPage = {
         <div class="stat-card"><div class="label">Inactive Members</div><div class="value">${summary.inactiveMemberCount}</div></div>
         <div class="stat-card"><div class="label">Core Members</div><div class="value">${summary.coreMemberCount}</div></div>
         <div class="stat-card"><div class="label">Upcoming Events</div><div class="value">${summary.upcomingEvents}</div></div>
+        <div class="stat-card"><div class="label">Notices</div><div class="value">${summary.noticeCount}</div></div>
       </div>
 
       <h3 class="stat-group-title">Finances</h3>
