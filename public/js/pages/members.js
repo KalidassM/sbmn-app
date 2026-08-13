@@ -27,8 +27,8 @@ window.MembersPage = {
           }
         </div>
         <table>
-          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Joined</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="8">Loading…</td></tr></tbody>
+          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Joined</th><th>Status</th><th>Inactive Since</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="9">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -67,7 +67,6 @@ window.MembersPage = {
     if (!panel) return;
     panel.innerHTML = `
       <div class="panel-header"><h3>Bulk Upload Members</h3></div>
-      <p class="page-sub" style="margin-top:-8px;">Upload a CSV to add new members or update existing ones (matched by Site No). Columns: <code>name, site_no, address, phone, email, join_date, status</code>.</p>
       <div class="toolbar">
         <button type="button" class="secondary" id="downloadSampleBtn">Download Sample CSV</button>
         <input type="file" id="bulkFile" accept=".csv" />
@@ -172,7 +171,7 @@ window.MembersPage = {
     const members = await Api.get('/members');
     const rows = document.getElementById('rows');
     if (!members.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="8">No members yet</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No members yet</td></tr>`;
       return;
     }
     rows.innerHTML = members
@@ -186,6 +185,7 @@ window.MembersPage = {
         <td>${Util.escapeHtml(m.email || '-')}</td>
         <td>${m.join_date || '-'}</td>
         <td><span class="badge ${m.status}">${m.status}</span></td>
+        <td>${m.inactive_date || '-'}</td>
         ${
           isAdmin
             ? `<td class="toolbar">

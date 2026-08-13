@@ -15,7 +15,7 @@ router.get('/payments', requireAuth, (req, res) => {
 
   let sql = `SELECT mp.*, m.name AS member_name, m.site_no, m.phone FROM maintenance_payments mp
              JOIN members m ON m.id = mp.member_id`;
-  const clauses = [];
+  const clauses = [`m.status = 'active'`];
   const params = [];
   if (month) {
     clauses.push('mp.month = ?');
@@ -67,7 +67,7 @@ router.get('/reminders', requireAuth, requireAdmin, (req, res) => {
               m.name AS member_name, m.site_no, m.phone
        FROM maintenance_payments mp
        JOIN members m ON m.id = mp.member_id
-       WHERE mp.month = ? AND mp.year = ? AND mp.status != 'paid'
+       WHERE mp.month = ? AND mp.year = ? AND mp.status != 'paid' AND m.status = 'active'
        ORDER BY m.name`
     )
     .all(month, year);

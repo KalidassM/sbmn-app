@@ -64,7 +64,7 @@ async function sendDailyReminders({ force = false } = {}) {
       `SELECT mp.id, mp.amount_due, mp.amount_paid, mp.month, mp.year, m.name, m.phone, m.site_no
        FROM maintenance_payments mp
        JOIN members m ON m.id = mp.member_id
-       WHERE mp.month = ? AND mp.year = ? AND mp.status != 'paid'`
+       WHERE mp.month = ? AND mp.year = ? AND mp.status != 'paid' AND m.status = 'active'`
     )
     .all(month, year);
 

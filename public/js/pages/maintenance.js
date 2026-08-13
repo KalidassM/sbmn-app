@@ -23,7 +23,6 @@ window.MaintenancePage = {
             <select id="statusFilter">
               <option value="all">All</option>
               <option value="unpaid">Unpaid</option>
-              <option value="partial">Partial</option>
               <option value="paid">Paid</option>
             </select>
             ${isAdmin ? '<button id="recordPaymentBtn">Record Payment</button>' : ''}
@@ -203,8 +202,7 @@ window.MaintenancePage = {
         <div class="field"><label>Amount Paid</label><input id="ed_amount_paid" type="number" step="0.01" min="0" required value="${payment.amount_paid}" /></div>
         <div class="field"><label>Status</label>
           <select id="ed_status">
-            <option value="unpaid" ${payment.status === 'unpaid' ? 'selected' : ''}>Unpaid</option>
-            <option value="partial" ${payment.status === 'partial' ? 'selected' : ''}>Partial</option>
+            <option value="unpaid" ${payment.status !== 'paid' ? 'selected' : ''}>Unpaid</option>
             <option value="paid" ${payment.status === 'paid' ? 'selected' : ''}>Paid</option>
           </select>
         </div>
@@ -233,7 +231,10 @@ window.MaintenancePage = {
       e.preventDefault();
       const amountDue = Number(document.getElementById('ed_amount_due').value);
       const amountPaid = Number(document.getElementById('ed_amount_paid').value);
-      const status = document.getElementById('ed_status').value;
+      // "Unpaid" is the dropdown's fallback option (Partial isn't selectable anymore) - only force
+      // a status when the admin explicitly picks "Paid", otherwise let the server derive
+      // unpaid/partial/paid from the amounts so a partially-paid due isn't silently flipped to unpaid
+      const statusChoice = document.getElementById('ed_status').value;
       const paidDate = document.getElementById('ed_date').value || null;
       const paymentMode = document.getElementById('ed_mode').value;
       const referenceNo = document.getElementById('ed_reference').value.trim();
@@ -241,7 +242,7 @@ window.MaintenancePage = {
         await Api.put(`/maintenance/payments/${payment.id}`, {
           amount_due: amountDue,
           amount_paid: amountPaid,
-          status,
+          status: statusChoice === 'paid' ? 'paid' : undefined,
           paid_date: paidDate,
           payment_mode: paymentMode || null,
           reference_no: referenceNo || null,

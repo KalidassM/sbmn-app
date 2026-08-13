@@ -86,11 +86,14 @@ router.put('/bulk-status', requireAuth, requireAdmin, (req, res) => {
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids array is required' });
   if (!['active', 'inactive'].includes(status)) return res.status(400).json({ error: 'status must be active or inactive' });
 
-  const update = db.prepare('UPDATE members SET status = ? WHERE id = ?');
+  const today = new Date().toISOString().slice(0, 10);
+  const update = db.prepare(
+    `UPDATE members SET status = ?, inactive_date = ? WHERE id = ?`
+  );
   let updated = 0;
   db.transaction((rowIds) => {
     rowIds.forEach((id) => {
-      updated += update.run(status, id).changes;
+      updated += update.run(status, status === 'inactive' ? today : null, id).changes;
     });
   })(ids);
   res.json({ updated });
@@ -100,8 +103,15 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Member not found' });
   const { name, site_no, address, phone, email, join_date, status } = req.body || {};
+  const finalStatus = status ?? existing.status;
+  let inactiveDate = existing.inactive_date;
+  if (finalStatus === 'inactive' && existing.status !== 'inactive') {
+    inactiveDate = new Date().toISOString().slice(0, 10);
+  } else if (finalStatus === 'active') {
+    inactiveDate = null;
+  }
   db.prepare(
-    `UPDATE members SET name = ?, site_no = ?, address = ?, phone = ?, email = ?, join_date = ?, status = ?
+    `UPDATE members SET name = ?, site_no = ?, address = ?, phone = ?, email = ?, join_date = ?, status = ?, inactive_date = ?
      WHERE id = ?`
   ).run(
     name ?? existing.name,
@@ -110,7 +120,8 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     phone ?? existing.phone,
     email ?? existing.email,
     join_date ?? existing.join_date,
-    status ?? existing.status,
+    finalStatus,
+    inactiveDate,
     req.params.id
   );
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);

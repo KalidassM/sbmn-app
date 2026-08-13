@@ -194,6 +194,11 @@ if (!memberColumns.includes('site_no')) {
   db.exec('ALTER TABLE members ADD COLUMN site_no TEXT');
 }
 
+// Migration: track the date a member was marked inactive
+if (!memberColumns.includes('inactive_date')) {
+  db.exec('ALTER TABLE members ADD COLUMN inactive_date TEXT');
+}
+
 // Migration: add Razorpay key columns if payment_settings pre-dates them
 const paymentSettingsColumns = db.prepare('PRAGMA table_info(payment_settings)').all().map((c) => c.name);
 if (!paymentSettingsColumns.includes('razorpay_key_id')) {
