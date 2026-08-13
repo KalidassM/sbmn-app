@@ -74,26 +74,29 @@ function isConnected() {
   return status === 'connected';
 }
 
-function toWhatsAppJid(phone) {
-  if (!phone) return null;
+function toWhatsAppJids(phone) {
+  if (!phone) return [];
   // Some members have more than one number on file (e.g. "9688502997 / 8072006482") -
-  // send to the first one that looks valid instead of concatenating all the digits together
+  // send to every one that looks valid instead of concatenating all the digits together
   const candidates = String(phone).split(/[/,]|\s+(?:or|and)\s+/i);
+  const jids = new Set();
   for (const candidate of candidates) {
     const digits = candidate.replace(/\D/g, '');
     if (digits.length >= 10) {
       const withCountryCode = digits.length === 10 ? `91${digits}` : digits;
-      return `${withCountryCode}@s.whatsapp.net`;
+      jids.add(`${withCountryCode}@s.whatsapp.net`);
     }
   }
-  return null;
+  return [...jids];
 }
 
 async function sendMessage(phone, text) {
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
-  const jid = toWhatsAppJid(phone);
-  if (!jid) throw new Error('No valid phone number on file');
-  await sock.sendMessage(jid, { text });
+  const jids = toWhatsAppJids(phone);
+  if (!jids.length) throw new Error('No valid phone number on file');
+  for (const jid of jids) {
+    await sock.sendMessage(jid, { text });
+  }
 }
 
 function logout() {
