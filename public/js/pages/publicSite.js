@@ -20,7 +20,6 @@ function toggleNav() {
 navToggle.addEventListener('click', toggleNav);
 navBackdrop.addEventListener('click', closeNav);
 navRight.querySelectorAll('a').forEach((a) => a.addEventListener('click', closeNav));
-document.getElementById('authNavBtn').addEventListener('click', closeNav);
 
 /* ---------- header scroll shadow ---------- */
 const siteHeader = document.getElementById('siteHeader');
@@ -68,7 +67,7 @@ document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
 /* ---------- auth (reuses the same admin login as the member portal) ---------- */
 function isAdmin() {
   const user = Api.getUser();
-  return !!(user && Api.getToken() && user.role === 'admin');
+  return !!(user && Api.getToken() && (user.role === 'admin' || user.role === 'super_admin'));
 }
 
 const authNavBtn = document.getElementById('authNavBtn');
@@ -81,8 +80,10 @@ function updateAuthUI() {
   document.getElementById('showNoticeForm').style.display = admin ? '' : 'none';
   document.getElementById('showEventForm').style.display = admin ? '' : 'none';
   document.getElementById('showMemberForm').style.display = admin ? '' : 'none';
-  authNavBtn.textContent = admin ? 'Logout' : 'Committee Login';
-  authNavBtn.classList.toggle('logged-in', admin);
+  if (authNavBtn) {
+    authNavBtn.textContent = admin ? 'Logout' : 'Committee Login';
+    authNavBtn.classList.toggle('logged-in', admin);
+  }
   renderNotices();
   renderEvents();
   renderCommittee();
@@ -98,14 +99,16 @@ function closeLoginModal() {
   loginModalBackdrop.classList.remove('show');
 }
 
-authNavBtn.addEventListener('click', () => {
-  if (isAdmin()) {
-    Api.clearSession();
-    updateAuthUI();
-  } else {
-    openLoginModal();
-  }
-});
+if (authNavBtn) {
+  authNavBtn.addEventListener('click', () => {
+    if (isAdmin()) {
+      Api.clearSession();
+      updateAuthUI();
+    } else {
+      openLoginModal();
+    }
+  });
+}
 document.getElementById('loginModalClose').addEventListener('click', closeLoginModal);
 loginModalBackdrop.addEventListener('click', (e) => {
   if (e.target === loginModalBackdrop) closeLoginModal();
@@ -118,7 +121,7 @@ loginForm.addEventListener('submit', async (e) => {
   const password = document.getElementById('loginPassword').value;
   try {
     const data = await Api.post('/auth/login', { username, password });
-    if (data.user.role !== 'admin') {
+    if (data.user.role !== 'admin' && data.user.role !== 'super_admin') {
       loginError.textContent = 'Only committee (admin) accounts can manage this page.';
       return;
     }

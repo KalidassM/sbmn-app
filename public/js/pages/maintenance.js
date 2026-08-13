@@ -5,7 +5,7 @@ window.MaintenancePage = {
 
   async render(container) {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const { month, year } = this.state;
 
     container.innerHTML = `
@@ -82,7 +82,7 @@ window.MaintenancePage = {
     const { month, year } = this.state;
     let payments = await Api.get(`/maintenance/payments?month=${month}&year=${year}`);
     const user = Api.getUser();
-    if (user.role !== 'admin' && user.member_id) {
+    if (!Util.isAdmin(user) && user.member_id) {
       payments = payments.filter((p) => p.member_id === user.member_id);
     }
     this.currentPayments = payments;
@@ -111,7 +111,7 @@ window.MaintenancePage = {
 
   renderRows() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const filter = this.state.statusFilter;
     const statusRank = { paid: 0, partial: 1, unpaid: 2 };
     const payments = (filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter))

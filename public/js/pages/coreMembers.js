@@ -1,7 +1,7 @@
 window.CoreMembersPage = {
   async render(container) {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     container.innerHTML = `
       <h1>Core Members</h1>
       <p class="page-sub">Committee positions and office bearers</p>
@@ -10,8 +10,8 @@ window.CoreMembersPage = {
       <div class="panel">
         <div class="panel-header"><h3>Committee</h3></div>
         <table>
-          <thead><tr><th>Name</th><th>Designation</th><th>From</th><th>To</th><th>Notes</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
+          <thead><tr><th>Photo</th><th>Name</th><th>Designation</th><th>From</th><th>To</th><th>Notes</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="7">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -28,17 +28,22 @@ window.CoreMembersPage = {
 
   async loadRows() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const rows = await Api.get('/core-members');
     const tbody = document.getElementById('rows');
     if (!rows.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No core members assigned yet</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No core members assigned yet</td></tr>`;
       return;
     }
     tbody.innerHTML = rows
       .map(
         (r) => `
       <tr>
+        <td>${
+          r.photo
+            ? `<img class="table-avatar" src="${r.photo}" alt="">`
+            : `<div class="table-avatar-fallback">${Util.escapeHtml(Util.initials(r.member_name))}</div>`
+        }</td>
         <td>${Util.escapeHtml(r.member_name)}</td>
         <td>${Util.escapeHtml(r.designation)}</td>
         <td>${r.start_date || '-'}</td>
@@ -96,6 +101,13 @@ window.CoreMembersPage = {
           <div class="field"><label>Start Date</label><input id="f_start" type="date" value="${row?.start_date || Util.todayISO()}" /></div>
           <div class="field"><label>End Date (optional)</label><input id="f_end" type="date" value="${row?.end_date || ''}" /></div>
           <div class="field"><label>Notes</label><input id="f_notes" value="${Util.escapeHtml(row?.notes || '')}" /></div>
+          <div class="field">
+            <label>Profile Photo</label>
+            <input id="f_photo" type="file" accept="image/*" />
+            <p class="text-muted" style="font-size:0.8rem;margin-top:4px;${row?.photo ? '' : 'display:none;'}" id="f_photo_hint">
+              ${row?.photo ? `<img src="${row.photo}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;" />Leave blank to keep current photo` : ''}
+            </p>
+          </div>
         </div>
         <div class="toolbar mt-16">
           <button type="submit">${isEdit ? 'Save Changes' : 'Assign'}</button>
@@ -106,14 +118,19 @@ window.CoreMembersPage = {
 
     document.getElementById('cmForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const payload = {
-        member_id: Number(document.getElementById('f_member').value),
-        designation: document.getElementById('f_designation').value.trim(),
-        start_date: document.getElementById('f_start').value,
-        end_date: document.getElementById('f_end').value || null,
-        notes: document.getElementById('f_notes').value.trim(),
-      };
+      const submitBtn = e.target.querySelector('button[type=submit]');
+      submitBtn.disabled = true;
       try {
+        const photoFile = document.getElementById('f_photo').files[0];
+        const photo = photoFile ? await Util.fileToResizedDataUrl(photoFile) : undefined;
+        const payload = {
+          member_id: Number(document.getElementById('f_member').value),
+          designation: document.getElementById('f_designation').value.trim(),
+          start_date: document.getElementById('f_start').value,
+          end_date: document.getElementById('f_end').value || null,
+          notes: document.getElementById('f_notes').value.trim(),
+          ...(isEdit ? (photo ? { photo } : {}) : { photo: photo || null }),
+        };
         if (isEdit) {
           await Api.put(`/core-members/${row.id}`, payload);
         } else {
@@ -124,6 +141,8 @@ window.CoreMembersPage = {
         this.showAlert(isEdit ? 'Updated.' : 'Assigned.', 'success');
       } catch (err) {
         this.showAlert(err.message);
+      } finally {
+        submitBtn.disabled = false;
       }
     });
 

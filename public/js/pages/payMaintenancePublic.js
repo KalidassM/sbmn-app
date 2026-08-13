@@ -73,7 +73,7 @@
   function duesRowHtml(d) {
     const remaining = Number(d.amount_due) - Number(d.amount_paid);
     return `
-      <div class="toolbar" style="justify-content:space-between; border-top:1px solid var(--border); padding-top:12px; margin-top:12px;" id="due-row-${d.id}">
+      <div class="toolbar" style="justify-content:space-between; border-top:1px solid var(--border); padding-top:12px; margin-top:12px; margin-bottom: 24px;" id="due-row-${d.id}">
         <div>
           <strong>${MONTH_NAMES[d.month]} ${d.year}</strong>
           <div class="text-muted" style="font-size:0.85rem;">${money(remaining)} due${d.status === 'partial' ? ' (partially paid)' : ''}</div>
@@ -90,10 +90,8 @@
     document.getElementById(`pay-btn-${due.id}`).style.display = 'none';
     box.innerHTML = `
       <div id="gatewayContent-${due.id}"></div>
-      <div id="qrToggleWrap-${due.id}" class="mt-16"><button type="button" class="secondary" id="toggleQrBtn-${due.id}" style="width:100%;">Pay by scanning a UPI QR code</button></div>
       <div id="qrContent-${due.id}"></div>
     `;
-    document.getElementById(`toggleQrBtn-${due.id}`).addEventListener('click', () => loadQr(due, remaining));
 
     request('/razorpay-config')
       .then((config) => {
@@ -101,9 +99,7 @@
         if (config.configured) {
           gatewayBox.innerHTML = `<button id="payOnlineBtn-${due.id}" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
           document.getElementById(`payOnlineBtn-${due.id}`).addEventListener('click', () => payWithRazorpay(due, remaining));
-          document.getElementById(`toggleQrBtn-${due.id}`).textContent = 'Or scan a UPI QR code instead';
         } else {
-          document.getElementById(`qrToggleWrap-${due.id}`).style.display = 'none';
           loadQr(due, remaining);
         }
       })
@@ -113,7 +109,6 @@
   }
 
   async function loadQr(due, remaining) {
-    document.getElementById(`toggleQrBtn-${due.id}`).style.display = 'none';
     const qrBox = document.getElementById(`qrContent-${due.id}`);
     qrBox.innerHTML = '<p class="text-muted">Loading QR code…</p>';
     try {

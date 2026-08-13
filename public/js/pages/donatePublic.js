@@ -42,11 +42,9 @@
       <p class="sub">Please complete your donation of <strong>${money(donation.amount)}</strong></p>
       <div id="alertBox"></div>
       <div id="gatewayContent"></div>
-      <div id="qrToggleWrap" class="mt-16"><button type="button" class="secondary" id="toggleQrBtn" style="width:100%;">Pay by scanning a UPI QR code</button></div>
       <div id="qrContent"></div>
       <div id="doneContent"></div>
     `;
-    document.getElementById('toggleQrBtn').addEventListener('click', () => loadQr(donation));
 
     request('/razorpay-config')
       .then((config) => {
@@ -54,9 +52,7 @@
         if (config.configured) {
           gatewayBox.innerHTML = `<button id="payOnlineBtn" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
           document.getElementById('payOnlineBtn').addEventListener('click', () => payWithRazorpay(donation));
-          document.getElementById('toggleQrBtn').textContent = 'Or scan a UPI QR code instead';
         } else {
-          document.getElementById('qrToggleWrap').style.display = 'none';
           loadQr(donation);
         }
       })
@@ -66,7 +62,6 @@
   }
 
   async function loadQr(donation) {
-    document.getElementById('toggleQrBtn').style.display = 'none';
     const qrBox = document.getElementById('qrContent');
     qrBox.innerHTML = '<p class="text-muted">Loading QR code…</p>';
     try {

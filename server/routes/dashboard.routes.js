@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get('/summary', requireAuth, (req, res) => {
   const memberCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE status = 'active'").get().c;
+  const inactiveMemberCount = db.prepare("SELECT COUNT(*) AS c FROM members WHERE status = 'inactive'").get().c;
   const coreMemberCount = db
     .prepare('SELECT COUNT(*) AS c FROM core_members WHERE end_date IS NULL')
     .get().c;
@@ -34,6 +35,7 @@ router.get('/summary', requireAuth, (req, res) => {
 
   res.json({
     memberCount,
+    inactiveMemberCount,
     coreMemberCount,
     upcomingEvents,
     totalExpenses,

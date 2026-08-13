@@ -4,7 +4,7 @@ window.MembersPage = {
 
   async render(container) {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     container.innerHTML = `
       <h1>Members</h1>
       <p class="page-sub">Association member directory</p>
@@ -168,7 +168,7 @@ window.MembersPage = {
 
   async loadRows() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const members = await Api.get('/members');
     const rows = document.getElementById('rows');
     if (!members.length) {

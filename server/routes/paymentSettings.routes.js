@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 const { buildUpiQr } = require('../utils/upiQr');
 
 const router = express.Router();
@@ -11,12 +11,12 @@ function toPublicSettings(row) {
   return { ...safe, razorpay_configured: !!(row.razorpay_key_id && razorpay_key_secret) };
 }
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, requireSuperAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM payment_settings WHERE id = 1').get();
   res.json(toPublicSettings(row));
 });
 
-router.put('/', requireAuth, requireAdmin, (req, res) => {
+router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
   const { upi_id, payee_name, bank_name, account_no, ifsc_code, razorpay_key_id, razorpay_key_secret } = req.body || {};
   const existing = db.prepare('SELECT * FROM payment_settings WHERE id = 1').get();
   db.prepare(

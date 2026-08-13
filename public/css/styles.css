@@ -9,16 +9,17 @@
   --accent: #b98b2a;
   --danger: #b3413c;
   --radius: 10px;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; */
   background: var(--bg);
   color: var(--text);
+  font-family: 'Mukta', sans-serif;
 }
 
 .loading-screen {
@@ -75,7 +76,7 @@ body {
 
 /* App shell (AdminLTE-based; see portal.html/app.js for the markup) */
 .app-sidebar { background: var(--primary-dark) !important; }
-.app-sidebar .brand-text { font-size: 1rem; line-height: 1.25; }
+.app-sidebar .brand-text { font-size: 1.6rem; line-height: 1.25; }
 .app-sidebar .nav-link.active { background: var(--primary); font-weight: 600; }
 
 .role-tag {
@@ -94,7 +95,7 @@ body {
 
 .main h1 {
   margin: 0 0 4px;
-  font-size: 1.5rem;
+  font-size: 2.5rem;
   color: var(--primary-dark);
 }
 
@@ -105,11 +106,26 @@ body {
 }
 
 /* Stat cards */
+.stat-group-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin: 0 0 25px;
+}
+
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin-bottom: 26px;
+}
+
+@media (max-width: 900px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .stat-grid { grid-template-columns: 1fr; }
 }
 
 .stat-card {
@@ -121,13 +137,13 @@ body {
 
 .stat-card .label {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 1.0rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .stat-card .value {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 700;
   margin-top: 6px;
   color: var(--primary-dark);
@@ -158,6 +174,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+  margin-top: 30px;
 }
 
 th, td {
@@ -169,6 +186,28 @@ th, td {
 th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
 
 tr:last-child td { border-bottom: none; }
+
+.table-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+.table-avatar-fallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--primary-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
 
 .empty-row td {
   color: var(--muted);

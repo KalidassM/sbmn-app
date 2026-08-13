@@ -79,6 +79,13 @@
   .nav-cta::after{display:none;}
   .nav-cta:hover{background:var(--vermilion-dark) !important;}
 
+  .nav-cta-green{
+    margin-left:8px; padding:10px 20px !important; border-radius:999px !important; background:var(--green); color:#fff !important;
+    font-weight:700; box-shadow:0 3px 10px rgba(166,54,28,0.28); white-space:nowrap;
+  }
+  .nav-cta-green::after{display:none;}
+  .nav-cta-green:hover{background:var(--green-dark) !important;}
+
   #authNavBtn{
     margin-left:8px; padding:10px 18px !important; border-radius:999px !important;
     background:transparent; border:1.5px solid var(--green) !important; color:var(--green) !important;
@@ -172,7 +179,7 @@
     display:flex; justify-content:center; gap:40px; flex-wrap:wrap; margin:0 auto 8px;
   }
   .stat-num{font-family:'Catamaran',sans-serif; font-weight:800; font-size:1.9rem; color:var(--green);}
-  .stat-label{font-size:0.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em;}
+  .stat-label{font-size:0.98rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em;}
   .cta-row{display:flex; justify-content:center; gap:14px; margin-top:28px; flex-wrap:wrap;}
   .btn{
     display:inline-flex; align-items:center; gap:8px;
@@ -370,9 +377,8 @@
           <li><a href="#committee">Committee</a></li>
           <li><a href="#gallery">Gallery</a></li>
           <li><a href="#contact">Contact</a></li>
+          <li><a href="/pay-monthly-maintenance" class="nav-cta-green">Pay Maintenance</a></li>
           <li><a href="/donate" class="nav-cta">Donate</a></li>
-          <li><a href="/portal">Member Portal</a></li>
-          <li><button type="button" id="authNavBtn">Committee Login</button></li>
         </ul>
       </nav>
     </div>
@@ -406,9 +412,9 @@
 
 <section class="hero">
   <div class="container">
-    <span class="eyebrow">Serving our neighbourhood, together</span>
+    <span class="eyebrow">SERVING OUR NEIGHBOURHOOD, TOGETHER</span>
     <h1>Sri Balamurugan Nagar Welfare Association</h1>
-    <p class="lede">A residents' collective working for cleaner streets, safer lanes, and a neighbourhood that looks out for one another — one notice, one event, one helping hand at a time.</p>
+    <p class="lede">Bringing residents together to build a cleaner, safer, and more connected neighbourhood — through shared responsibility, open communication, and community participation.</p>
     <div class="hero-stats">
       <div><div class="stat-num" id="statHouseholds">—</div><div class="stat-label">Member households</div></div>
       <div><div class="stat-num" id="statNotices">—</div><div class="stat-label">Active notices</div></div>
@@ -430,22 +436,23 @@
   <div class="container about-grid reveal">
     <div class="about-copy">
       <span class="eyebrow">About Us</span>
-      <h2>Built by residents, run by residents</h2>
-      <p>Sri Balamurugan Nagar Welfare Association was formed by the residents of our locality to look after the everyday concerns that a municipal office rarely gets to in time — waste collection, street lighting, water supply, road maintenance, and the small disputes that come with shared walls and shared streets.</p>
-      <p>We meet regularly, publish decisions openly on this notice board, and run the events that keep this a neighbourhood rather than just an address. Every household in the layout is welcome to attend meetings, raise concerns, and stand for committee positions.</p>
+      <h2>By Residents, for Our Community</h2>
+      <p>Sri Balamurugan Nagar Welfare Association brings residents together to care for our neighbourhood and improve everyday life in the Nagar.</p>
+      <p>We work closely with residents and local authorities on matters such as street lighting, roads, drainage, waste management, water supply, safety, and other shared concerns.</p>
+      <p>Beyond civic needs, the association helps build a stronger community through neighbourhood events, welfare initiatives, regular meetings, and open communication. Every household is encouraged to participate, share concerns, contribute ideas, and be part of shaping a better Nagar.</p>
     </div>
     <div class="pillars">
       <div class="pillar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-8h6v8"/></svg>
-        <div><h4>Civic upkeep</h4><p>Streetlights, drainage, roads, and waste collection followed up with ward officials.</p></div>
+        <div><h4>Civic Upkeep</h4><p>Working with local authorities on streetlights, drainage, roads, waste management, and other neighbourhood infrastructure.</p></div>
       </div>
       <div class="pillar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-        <div><h4>Community welfare</h4><p>Support for elderly residents, festival celebrations, and neighbourhood watch.</p></div>
+        <div><h4>Community Welfare</h4><p>Supporting resident well-being, community celebrations, neighbourhood initiatives, and activities that bring people together.</p></div>
       </div>
       <div class="pillar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
-        <div><h4>Open governance</h4><p>Minutes, notices, and accounts shared openly with every member household.</p></div>
+        <div><h4>Open & Transparent</h4><p>Keeping residents informed through notices, meeting updates, decisions, and important association information.</p></div>
       </div>
     </div>
   </div>
@@ -455,8 +462,8 @@
   <div class="container reveal">
     <div class="section-head">
       <span class="eyebrow">Notice Board</span>
-      <h2>What's happening in the Nagar</h2>
-      <p>Posted by the committee. Visible to every member — updates here appear for all visitors of this site.</p>
+      <h2>Updates from the Nagar</h2>
+      <p>Find important announcements and information shared by the committee — from maintenance notices and meeting updates to community guidelines and general reminders. <br/> <br/> Check here regularly to stay informed about matters concerning the Nagar.</p>
     </div>
     <div class="board-wrap">
       <div class="board-top">
@@ -490,8 +497,8 @@
   <div class="container reveal">
     <div class="section-head">
       <span class="eyebrow">Events Calendar</span>
-      <h2>Upcoming in the neighbourhood</h2>
-      <p>From Pongal celebrations to clean-up drives — added by the committee, open to all residents.</p>
+      <h2>Coming Up in the Neighbourhood</h2>
+      <p>See what’s happening around the Nagar — festivals, celebrations, community gatherings, clean-up drives, activities, and more. <br/> Explore upcoming events, save the dates, and join your neighbours in making our community more connected and vibrant.</p>
     </div>
     <div style="text-align:center; margin-bottom:28px;">
       <button class="btn btn-primary btn-small form-toggle-btn" id="showEventForm" style="display:none;">+ Add an Event</button>
@@ -529,8 +536,9 @@
   <div class="container reveal">
     <div class="section-head">
       <span class="eyebrow">Our Committee</span>
-      <h2>The residents who run things</h2>
-      <p>Elected by member households for a two-year term.</p>
+      <h2>Meet Your Community Committee</h2>
+      <p>Get to know the residents elected to represent our Nagar and help keep our community running smoothly.
+The committee works together on community matters, resident concerns, neighbourhood initiatives, and decisions that help make the Nagar a better place for everyone.</p>
     </div>
     <div style="text-align:center; margin-bottom:28px;">
       <button class="btn btn-primary btn-small form-toggle-btn" id="showMemberForm" style="display:none;">+ Add Committee Member</button>
@@ -563,33 +571,33 @@
   <div class="container reveal">
     <div class="section-head">
       <span class="eyebrow">Life in the Nagar</span>
-      <h2>Moments we celebrate together</h2>
-      <p>A glimpse of the activities this Association organises through the year.</p>
+      <h2>Together Beyond Our Doorsteps</h2>
+      <p>Our Nagar is more than a place to live — it’s a community we build together. Throughout the year, residents come together to celebrate, contribute, connect, and care for our neighbourhood.</p>
     </div>
     <div class="gallery-grid">
       <div class="gallery-tile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v6M12 16v6M4 12h6M14 12h6"/><circle cx="12" cy="12" r="3"/></svg>
-        <h4>Pongal Celebrations</h4><p>Annual community feast and cultural programme</p>
+        <h4>Festival Celebrations</h4><p>Coming together to celebrate festivals, traditions, and special occasions as one community.</p>
       </div>
       <div class="gallery-tile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V10l7-6 7 6v11"/></svg>
-        <h4>Street Clean-up Drives</h4><p>Monthly volunteer efforts around the layout</p>
+        <h4>Neighbourhood Clean-ups</h4><p>Resident-led efforts to keep our streets and shared spaces clean and welcoming.</p>
       </div>
       <div class="gallery-tile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-4.4-9.5-8.8C.6 8.4 3 5 6.5 5c2 0 3.4 1.1 4.5 2.6C12.1 6.1 13.5 5 15.5 5 19 5 21.4 8.4 21.5 12.2 19 16.6 12 21 12 21Z"/></svg>
-        <h4>Elder Care Visits</h4><p>Regular check-ins with senior residents</p>
+        <h4>Senior Citizen Support</h4><p>Connecting with and supporting senior residents through community care and assistance.</p>
       </div>
       <div class="gallery-tile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 4v16"/></svg>
-        <h4>General Body Meetings</h4><p>Quarterly open meetings for all households</p>
+        <h4>Resident Meetings</h4><p>Open discussions where residents can share ideas, raise concerns, and stay involved.</p>
       </div>
       <div class="gallery-tile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3c4 3 7 6 7 10a7 7 0 0 1-14 0c0-4 3-7 7-10Z"/></svg>
-        <h4>Tree Planting</h4><p>Greening our streets, one sapling at a time</p>
+        <h4>Green Initiatives</h4><p>Tree planting and environmental activities that help create a greener, healthier Nagar.</p>
       </div>
       <div class="gallery-tile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-        <h4>Youth Sports Meet</h4><p>Annual games for children and young residents</p>
+        <h4>Sports & Recreation</h4><p>Games and activities that bring children, youth, and families together.</p>
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 const { sendMail } = require('../utils/mailer');
 
 const router = express.Router();
@@ -16,7 +16,7 @@ router.get('/', requireAuth, (req, res) => {
   res.json(toPublicSettings(row));
 });
 
-router.put('/', requireAuth, requireAdmin, (req, res) => {
+router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
   const {
     maintenance_amount,
     opening_bank_balance,
@@ -80,7 +80,7 @@ router.put('/', requireAuth, requireAdmin, (req, res) => {
   res.json(toPublicSettings(row));
 });
 
-router.post('/test-email', requireAuth, requireAdmin, async (req, res) => {
+router.post('/test-email', requireAuth, requireSuperAdmin, async (req, res) => {
   const settings = db.prepare('SELECT contact_email FROM general_settings WHERE id = 1').get();
   const to = settings?.contact_email;
   if (!to) return res.status(400).json({ error: 'Set a Contact Email in General Settings first' });

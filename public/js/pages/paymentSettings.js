@@ -38,7 +38,7 @@ window.PaymentSettingsPage = {
         <div class="panel-header"><h3>Preview</h3></div>
         <div class="form-grid" style="align-items:start;">
           <div class="field"><label>Test Amount (₹)</label><input id="previewAmount" type="number" value="500" /></div>
-          <div class="field"><button type="button" id="previewBtn" class="secondary">Show Sample QR</button></div>
+          <div class="field"><button type="button" id="previewBtn" class="secondary" style="margin-top: 22px;">Show Sample QR</button></div>
         </div>
         <div id="previewBox"></div>
       </div>

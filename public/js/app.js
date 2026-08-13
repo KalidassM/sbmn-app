@@ -19,6 +19,39 @@ const Util = {
     const d = new Date();
     return d.toISOString().slice(0, 10);
   },
+  isAdmin(user) {
+    return !!user && (user.role === 'admin' || user.role === 'super_admin');
+  },
+  initials(name) {
+    return (name || '')
+      .split(' ')
+      .map((w) => w[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  },
+  // Downscales an uploaded image client-side before storing it as a base64 data URL
+  fileToResizedDataUrl(file, maxDim = 360, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Could not read the selected file'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Could not read the selected image'));
+        img.onload = () => {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  },
   openModal(innerHtml) {
     let overlay = document.getElementById('modalOverlay');
     if (!overlay) {
@@ -51,8 +84,8 @@ const NAV_ITEMS = [
   { path: '#/donations', label: 'Donations', icon: 'bi-heart' },
   { path: '#/contact-messages', label: 'Contact Messages', icon: 'bi-envelope', adminOnly: true },
   { path: '#/users', label: 'Login Accounts', icon: 'bi-shield-lock', adminOnly: true },
-  { path: '#/payment-settings', label: 'Payment Settings', icon: 'bi-credit-card', adminOnly: true },
-  { path: '#/general-settings', label: 'General Settings', icon: 'bi-gear', adminOnly: true },
+  { path: '#/payment-settings', label: 'Payment Settings', icon: 'bi-credit-card', superAdminOnly: true },
+  { path: '#/general-settings', label: 'General Settings', icon: 'bi-gear', superAdminOnly: true },
 ];
 
 const PAGES = {
@@ -89,7 +122,7 @@ function renderShell() {
             <li class="nav-item d-none d-sm-flex align-items-center">
               <span class="nav-link disabled">
                 Signed in as <strong>${Util.escapeHtml(user.username)}</strong>
-                <span class="role-tag">${user.role === 'admin' ? 'Core Member / Admin' : 'Member'}</span>
+                <span class="role-tag">${user.role === 'super_admin' ? 'Super Admin' : user.role === 'admin' ? 'Core Member / Admin' : 'Member'}</span>
               </span>
             </li>
             <li class="nav-item">
@@ -142,7 +175,11 @@ function renderNav(activePath) {
   const user = Api.getUser();
   const nav = document.getElementById('nav');
   if (!nav) return;
-  nav.innerHTML = NAV_ITEMS.filter((item) => !item.adminOnly || user.role === 'admin')
+  nav.innerHTML = NAV_ITEMS.filter(
+    (item) =>
+      (!item.adminOnly || user.role === 'admin' || user.role === 'super_admin') &&
+      (!item.superAdminOnly || user.role === 'super_admin')
+  )
     .map(
       (item) => `
       <li class="nav-item">
@@ -189,7 +226,11 @@ async function router() {
   }
 
   const navItem = NAV_ITEMS.find((item) => item.path === hash);
-  if (navItem && navItem.adminOnly && user.role !== 'admin') {
+  if (navItem && navItem.superAdminOnly && user.role !== 'super_admin') {
+    window.location.hash = '#/dashboard';
+    return;
+  }
+  if (navItem && navItem.adminOnly && user.role !== 'admin' && user.role !== 'super_admin') {
     window.location.hash = '#/dashboard';
     return;
   }

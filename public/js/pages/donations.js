@@ -1,7 +1,7 @@
 window.DonationsPage = {
   async render(container) {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     container.innerHTML = `
       <h1>Donations</h1>
       <p class="page-sub">Track donations from members and well-wishers</p>
@@ -29,7 +29,7 @@ window.DonationsPage = {
 
   async loadRows() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const donations = await Api.get('/donations');
     const tbody = document.getElementById('rows');
     const total = donations.reduce((sum, d) => sum + Number(d.amount), 0);

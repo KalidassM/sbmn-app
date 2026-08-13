@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('admin','member')),
+  role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('admin','member','super_admin')),
   member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -259,13 +259,37 @@ if (!coreMemberColumns.includes('photo')) {
   db.exec('ALTER TABLE core_members ADD COLUMN photo TEXT');
 }
 
+// Migration: add the super_admin role (full access, incl. Payment/General Settings which
+// regular admins can no longer reach). SQLite can't ALTER a CHECK constraint in place, so
+// the table is rebuilt when an older schema is detected.
+const usersTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get()?.sql || '';
+if (usersTableSql && !usersTableSql.includes('super_admin')) {
+  db.exec(`
+    ALTER TABLE users RENAME TO users_old;
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('admin','member','super_admin')),
+      member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    INSERT INTO users (id, username, password_hash, role, member_id, created_at)
+      SELECT id, username, password_hash, role, member_id, created_at FROM users_old;
+    DROP TABLE users_old;
+  `);
+  // Promote the original seeded admin account so nobody is locked out of Payment/General
+  // Settings the moment this migration runs
+  db.prepare("UPDATE users SET role = 'super_admin' WHERE username = 'admin' AND role = 'admin'").run();
+}
+
 // Seed a default admin account on first run
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
 if (userCount === 0) {
   const passwordHash = bcrypt.hashSync('admin123', 10);
   db.prepare(
     'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)'
-  ).run('admin', passwordHash, 'admin');
+  ).run('admin', passwordHash, 'super_admin');
   console.log('Seeded default admin user -> username: admin / password: admin123 (please change this)');
 }
 

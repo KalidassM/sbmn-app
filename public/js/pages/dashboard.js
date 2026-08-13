@@ -4,27 +4,35 @@ window.DashboardPage = {
     const content = document.getElementById('content');
     const user = Api.getUser();
 
-    const [summary, events, donations] = await Promise.all([
+    const [summary, events, donations, notices] = await Promise.all([
       Api.get('/dashboard/summary'),
       Api.get('/events'),
       Api.get('/donations'),
+      Api.get('/notices'),
     ]);
 
     const upcoming = events
       .filter((e) => e.event_date >= Util.todayISO())
       .slice(0, 5);
     const myDonations = user.member_id ? donations.filter((d) => d.member_id === user.member_id).slice(0, 5) : [];
+    const recentNotices = notices.slice(0, 5);
 
     content.innerHTML = `
+      <h3 class="stat-group-title">Community</h3>
       <div class="stat-grid">
         <div class="stat-card"><div class="label">Active Members</div><div class="value">${summary.memberCount}</div></div>
+        <div class="stat-card"><div class="label">Inactive Members</div><div class="value">${summary.inactiveMemberCount}</div></div>
         <div class="stat-card"><div class="label">Core Members</div><div class="value">${summary.coreMemberCount}</div></div>
         <div class="stat-card"><div class="label">Upcoming Events</div><div class="value">${summary.upcomingEvents}</div></div>
-        <div class="stat-card"><div class="label">Maintenance Collected</div><div class="value">${Util.money(summary.totalMaintenanceCollected)}</div></div>
-        <div class="stat-card ${summary.totalMaintenanceDue > 0 ? 'negative' : ''}"><div class="label">Maintenance Due (This Month)</div><div class="value">${Util.money(summary.totalMaintenanceDue)}</div></div>
+      </div>
+
+      <h3 class="stat-group-title">Finances</h3>
+      <div class="stat-grid">
+        <div class="stat-card ${summary.balance < 0 ? 'negative' : ''}"><div class="label">Total Balance (Bank + Cash + Donations)</div><div class="value">${Util.money(summary.balance)}</div></div>
+        <div class="stat-card"><div class="label">Maintenance Collected (this month)</div><div class="value">${Util.money(summary.totalMaintenanceCollected)}</div></div>
+        <div class="stat-card ${summary.totalMaintenanceDue > 0 ? 'negative' : ''}"><div class="label">Maintenance Pending Due (this month)</div><div class="value">${Util.money(summary.totalMaintenanceDue)}</div></div>
         <div class="stat-card"><div class="label">Total Donations</div><div class="value">${Util.money(summary.totalDonations)}</div></div>
         <div class="stat-card"><div class="label">Total Expenses</div><div class="value">${Util.money(summary.totalExpenses)}</div></div>
-        <div class="stat-card ${summary.balance < 0 ? 'negative' : ''}"><div class="label">Net Balance</div><div class="value">${Util.money(summary.balance)}</div></div>
       </div>
 
       ${
@@ -69,6 +77,24 @@ window.DashboardPage = {
                     )
                     .join('')
                 : '<tr class="empty-row"><td colspan="3">No upcoming events</td></tr>'
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3>Notices</h3><a href="#/notices" class="btn secondary">View all</a></div>
+        <table>
+          <thead><tr><th>Title</th><th>Details</th><th>Posted</th></tr></thead>
+          <tbody>
+            ${
+              recentNotices.length
+                ? recentNotices
+                    .map(
+                      (n) => `<tr><td>${Util.escapeHtml(n.title)}${n.pinned ? ' <span class="badge active">Pinned</span>' : ''}</td><td>${Util.escapeHtml(n.body)}</td><td>${n.created_at || '-'}</td></tr>`
+                    )
+                    .join('')
+                : '<tr class="empty-row"><td colspan="3">No notices yet</td></tr>'
             }
           </tbody>
         </table>

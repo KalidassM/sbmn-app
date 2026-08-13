@@ -24,6 +24,7 @@ window.UsersPage = {
   },
 
   async loadRows() {
+    const isSuperAdmin = Api.getUser().role === 'super_admin';
     const users = await Api.get('/users');
     const rows = document.getElementById('rows');
     rows.innerHTML = users
@@ -31,10 +32,10 @@ window.UsersPage = {
         (u) => `
       <tr>
         <td>${Util.escapeHtml(u.username)}</td>
-        <td><span class="badge ${u.role === 'admin' ? 'active' : 'partial'}">${u.role}</span></td>
+        <td><span class="badge ${['admin', 'super_admin'].includes(u.role) ? 'active' : 'partial'}">${u.role.replace('_', ' ')}</span></td>
         <td>${Util.escapeHtml(u.member_name || '-')}</td>
         <td class="toolbar">
-          <button class="small secondary" data-reset="${u.id}">Reset Password</button>
+          ${isSuperAdmin ? `<button class="small secondary" data-reset="${u.id}">Reset Password</button>` : ''}
           ${u.username !== 'admin' ? `<button class="small danger" data-del="${u.id}">Delete</button>` : ''}
         </td>
       </tr>`
@@ -67,6 +68,7 @@ window.UsersPage = {
   },
 
   renderForm(panel) {
+    const isSuperAdmin = Api.getUser().role === 'super_admin';
     const memberOptions =
       '<option value="">-- No linked member --</option>' +
       this.members.map((m) => `<option value="${m.id}">${Util.escapeHtml(m.name)}</option>`).join('');
@@ -79,7 +81,8 @@ window.UsersPage = {
           <div class="field"><label>Role</label>
             <select id="u_role">
               <option value="member">Member (view-only)</option>
-              <option value="admin">Admin / Core Member (full access)</option>
+              <option value="admin">Admin / Core Member (No Settings access)</option>
+              ${isSuperAdmin ? '<option value="super_admin">Super Admin (full access)</option>' : ''}
             </select>
           </div>
           <div class="field"><label>Linked Member</label><select id="u_member">${memberOptions}</select></div>

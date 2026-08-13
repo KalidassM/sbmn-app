@@ -1,7 +1,7 @@
 window.EventsPage = {
   async render(container) {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     container.innerHTML = `
       <h1>Events</h1>
       <p class="page-sub">Association events and gatherings</p>
@@ -26,7 +26,7 @@ window.EventsPage = {
 
   async loadRows() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const events = await Api.get('/events');
     const tbody = document.getElementById('rows');
     if (!events.length) {

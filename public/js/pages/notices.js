@@ -1,7 +1,7 @@
 window.NoticesPage = {
   async render(container) {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     container.innerHTML = `
       <h1>Notices</h1>
       <p class="page-sub">Notice board shown on the public site</p>
@@ -26,7 +26,7 @@ window.NoticesPage = {
 
   async loadRows() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const notices = await Api.get('/notices');
     const tbody = document.getElementById('rows');
     if (!notices.length) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,7 +18,10 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   const { username, password, role, member_id } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
-  const finalRole = role === 'admin' ? 'admin' : 'member';
+  if (role === 'super_admin' && req.user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Only a Super Admin can create another Super Admin account' });
+  }
+  const finalRole = ['admin', 'super_admin'].includes(role) ? role : 'member';
   const hash = bcrypt.hashSync(password, 10);
   try {
     const info = db
@@ -31,7 +34,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.put('/:id/reset-password', requireAuth, requireAdmin, (req, res) => {
+router.put('/:id/reset-password', requireAuth, requireSuperAdmin, (req, res) => {
   const { password } = req.body || {};
   if (!password) return res.status(400).json({ error: 'password is required' });
   const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);

@@ -9,7 +9,7 @@ const router = express.Router();
 function loadDue(paymentId, user) {
   const due = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(paymentId);
   if (!due) return { error: 404, message: 'Due record not found' };
-  if (user.role !== 'admin' && due.member_id !== user.member_id) {
+  if (!['admin', 'super_admin'].includes(user.role) && due.member_id !== user.member_id) {
     return { error: 403, message: 'You can only pay your own dues' };
   }
   if (due.status === 'paid') {

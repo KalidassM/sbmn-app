@@ -4,7 +4,7 @@ window.ExpensesPage = {
 
   async render(container) {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
 
     container.innerHTML = `
       <h1>Expenses & Petty Cash</h1>
@@ -93,7 +93,7 @@ window.ExpensesPage = {
 
   async loadExpenses() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const expenses = await Api.get('/expenses');
     this.currentExpenses = expenses;
     const rows = document.getElementById('expenseRows');
@@ -206,15 +206,15 @@ window.ExpensesPage = {
 
   async loadPettyCash() {
     const user = Api.getUser();
-    const isAdmin = user.role === 'admin';
+    const isAdmin = Util.isAdmin(user);
     const { transactions, summary } = await Api.get('/petty-cash');
     this.currentTransactions = transactions;
 
     const statsEl = document.getElementById('pettyCashStats');
     statsEl.innerHTML = `
       <div class="stat-card ${summary.balance < 0 ? 'negative' : ''}"><div class="label">Cash in Hand</div><div class="value">${Util.money(summary.balance)}</div></div>
-      <div class="stat-card"><div class="label">Total Topped Up</div><div class="value">${Util.money(summary.totalTopups)}</div></div>
-      <div class="stat-card"><div class="label">Total Spent</div><div class="value">${Util.money(summary.totalExpenses)}</div></div>
+      <div class="stat-card"><div class="label">Total Topped Up to Petty Cash from Bank</div><div class="value">${Util.money(summary.totalTopups)}</div></div>
+      <div class="stat-card"><div class="label">Total Petty Cash Spent</div><div class="value">${Util.money(summary.totalExpenses)}</div></div>
     `;
 
     const rows = document.getElementById('pettyCashRows');

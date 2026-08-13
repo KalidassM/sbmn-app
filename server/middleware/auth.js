@@ -15,10 +15,17 @@ function requireAuth(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
 }
 
-module.exports = { requireAuth, requireAdmin, JWT_SECRET };
+function requireSuperAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin access required' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin, requireSuperAdmin, JWT_SECRET };

@@ -4,62 +4,69 @@ window.GeneralSettingsPage = {
       <h1>General Settings</h1>
       <p class="page-sub">Association-wide configuration</p>
       <div id="alertBox"></div>
-      <div class="panel">
-        <form id="settingsForm">
-        <div class="panel-header"><h3>Association Profile</h3></div>
-        <div class="form-grid">
-          <div class="field"><label>App Name</label><input id="appName" placeholder="Sri Balamurugan Nagar Welfare Association" /></div>
-          <div class="field"><label>Contact Email</label><input id="contactEmail" type="email" placeholder="e.g. association@example.com" /></div>
-          <div class="field"><label>Phone Number</label><input id="phoneNumber" placeholder="e.g. +91 98765 43210" /></div>
-          <div class="field"><label>Office Hours</label><input id="officeHours" placeholder="e.g. Every Sunday, 5 PM - 6 PM" /></div>
+      <form id="settingsForm">
+        <div class="panel">
+          <div class="panel-header"><h3>Association Profile</h3></div>
+          <div class="form-grid">
+            <div class="field"><label>App Name</label><input id="appName" placeholder="Sri Balamurugan Nagar Welfare Association" /></div>
+            <div class="field"><label>Contact Email</label><input id="contactEmail" type="email" placeholder="e.g. association@example.com" /></div>
+            <div class="field"><label>Phone Number</label><input id="phoneNumber" placeholder="e.g. +91 98765 43210" /></div>
+            <div class="field"><label>Office Hours</label><input id="officeHours" placeholder="e.g. Every Sunday, 5 PM - 6 PM" /></div>
+          </div>
+          <div class="field"><label>Office Address</label><input id="officeAddress" placeholder="Street, area, city, PIN" /></div>
+          <p class="text-muted" style="font-size:0.85rem;">Contact Email also receives an email notification whenever a member's maintenance payment is recorded (see Email Settings below).</p>
         </div>
-        <div class="field"><label>Office Address</label><input id="officeAddress" placeholder="Street, area, city, PIN" /></div>
-        <p class="text-muted" style="font-size:0.85rem;">Contact Email also receives an email notification whenever a member's maintenance payment is recorded (see Email Settings below).</p>
 
-        <div class="panel-header" style="margin-top:20px;"><h3>Monthly Maintenance</h3></div>
-        <div class="form-grid">
-          <div class="field"><label>Maintenance Dues Amount (₹ per member/month)</label><input id="maintenanceAmount" type="number" step="0.01" min="0" required /></div>
+        <div class="panel">
+          <div class="panel-header"><h3>Monthly Maintenance</h3></div>
+          <div class="form-grid">
+            <div class="field"><label>Maintenance Dues Amount (₹ per member/month)</label><input id="maintenanceAmount" type="number" step="0.01" min="0" required /></div>
+          </div>
+          <p class="text-muted" style="font-size:0.85rem;">Applied automatically each month to generate maintenance dues for every active member — no manual step needed on the Maintenance page.</p>
         </div>
-        <p class="text-muted" style="font-size:0.85rem;">Applied automatically each month to generate maintenance dues for every active member — no manual step needed on the Maintenance page.</p>
 
-        <div class="panel-header" style="margin-top:20px;"><h3>Reminder Schedule</h3></div>
-        <div class="field"><label>Days of the month to send WhatsApp reminders on</label>
-          <div id="reminderDaysGrid" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;max-width:420px;">
-            ${Array.from({ length: 31 }, (_, i) => i + 1)
-              .map(
-                (d) => `
-              <label style="display:flex;align-items:center;gap:4px;font-weight:normal;font-size:0.85rem;">
-                <input type="checkbox" class="reminderDay" value="${d}" /> ${d}
-              </label>`
-              )
-              .join('')}
+        <div class="panel">
+          <div class="panel-header"><h3>Reminder Schedule</h3></div>
+          <div class="field"><label>Days of the month to send WhatsApp reminders on</label>
+            <div id="reminderDaysGrid" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;max-width:420px;">
+              ${Array.from({ length: 31 }, (_, i) => i + 1)
+                .map(
+                  (d) => `
+                <label style="display:flex;align-items:center;gap:4px;font-weight:normal;font-size:0.85rem;">
+                  <input type="checkbox" class="reminderDay" value="${d}" /> ${d}
+                </label>`
+                )
+                .join('')}
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label>Time to send (IST)</label><input id="reminderTime" type="time" required /></div>
+          </div>
+          <p class="text-muted" style="font-size:0.85rem;">On each checked day, once this time passes (India time), every member with an unpaid due for that month gets a WhatsApp reminder automatically — see the WhatsApp Reminders section below to link the account it sends from.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><h3>Opening Balances</h3></div>
+          <div class="form-grid">
+            <div class="field"><label>Opening Bank Balance (₹, before digital tracking started)</label><input id="openingBankBalance" type="number" step="0.01" min="0" /></div>
+            <div class="field"><label>Opening Petty Cash Balance (₹, before digital tracking started)</label><input id="openingPettyCashBalance" type="number" step="0.01" min="0" /></div>
+          </div>
+          <p class="text-muted" style="font-size:0.85rem;">Money already sitting in the bank account or petty cash box before this system started recording transactions. Added into the Dashboard's Net Balance and the Petty Cash page's Cash in Hand figure.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><h3>Email Settings (Resend) <span id="emailBadge"></span></h3></div>
+          <div class="form-grid">
+            <div class="field"><label>Resend API Key</label><input id="resendApiKey" type="password" placeholder="leave blank to keep current" /></div>
+            <div class="field"><label>From Email</label><input id="resendFromEmail" type="email" placeholder="onboarding@resend.dev" /></div>
+          </div>
+          <p class="text-muted" style="font-size:0.85rem;">Used to send the payment-received notification above, via <a href="https://resend.com" target="_blank">Resend</a>'s free tier. Get an API key from resend.com/api-keys. Leave From Email blank to use Resend's shared sandbox sender (<code>onboarding@resend.dev</code>) &mdash; no domain setup needed to get started; verify your own domain in Resend later if you want to send from your association's own address.</p>
+          <div class="toolbar mt-16">
+            <button type="submit">Save</button>
+            <button type="button" class="secondary" id="testEmailBtn">Send Test Email</button>
           </div>
         </div>
-        <div class="form-grid">
-          <div class="field"><label>Time to send (IST)</label><input id="reminderTime" type="time" required /></div>
-        </div>
-        <p class="text-muted" style="font-size:0.85rem;">On each checked day, once this time passes (India time), every member with an unpaid due for that month gets a WhatsApp reminder automatically — see the WhatsApp Reminders section below to link the account it sends from.</p>
-
-        <div class="panel-header" style="margin-top:20px;"><h3>Opening Balances</h3></div>
-        <div class="form-grid">
-          <div class="field"><label>Opening Bank Balance (₹, before digital tracking started)</label><input id="openingBankBalance" type="number" step="0.01" min="0" /></div>
-          <div class="field"><label>Opening Petty Cash Balance (₹, before digital tracking started)</label><input id="openingPettyCashBalance" type="number" step="0.01" min="0" /></div>
-        </div>
-        <p class="text-muted" style="font-size:0.85rem;">Money already sitting in the bank account or petty cash box before this system started recording transactions. Added into the Dashboard's Net Balance and the Petty Cash page's Cash in Hand figure.</p>
-
-        <div class="panel-header" style="margin-top:20px;"><h3>Email Settings (Resend) <span id="emailBadge"></span></h3></div>
-        <div class="form-grid">
-          <div class="field"><label>Resend API Key</label><input id="resendApiKey" type="password" placeholder="leave blank to keep current" /></div>
-          <div class="field"><label>From Email</label><input id="resendFromEmail" type="email" placeholder="onboarding@resend.dev" /></div>
-        </div>
-        <p class="text-muted" style="font-size:0.85rem;">Used to send the payment-received notification above, via <a href="https://resend.com" target="_blank">Resend</a>'s free tier. Get an API key from resend.com/api-keys. Leave From Email blank to use Resend's shared sandbox sender (<code>onboarding@resend.dev</code>) &mdash; no domain setup needed to get started; verify your own domain in Resend later if you want to send from your association's own address.</p>
-
-        <div class="toolbar mt-16">
-          <button type="submit">Save</button>
-          <button type="button" class="secondary" id="testEmailBtn">Send Test Email</button>
-        </div>
-        </form>
-      </div>
+      </form>
 
       <div class="panel">
         <div class="panel-header"><h3>WhatsApp Reminders <span id="waBadge"></span></h3></div>
@@ -160,7 +167,7 @@ window.GeneralSettingsPage = {
       content.innerHTML = `
         <p class="text-muted" style="font-size:0.85rem;">Linked and ready. Reminders will send automatically on the scheduled days.</p>
         <div class="toolbar">
-          <input type="tel" id="waTestPhone" placeholder="Test phone number, e.g. 9876543210" style="max-width:240px;" />
+          <input type="tel" id="waTestPhone" placeholder="e.g. 9876543210" style="max-width:240px;" />
           <button type="button" class="secondary" id="waTestBtn">Send Test Message</button>
           <button type="button" class="secondary" id="waLogoutBtn">Unlink WhatsApp</button>
         </div>
