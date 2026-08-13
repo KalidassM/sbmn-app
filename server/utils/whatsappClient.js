@@ -75,10 +75,18 @@ function isConnected() {
 }
 
 function toWhatsAppJid(phone) {
-  const digits = (phone || '').replace(/\D/g, '');
-  if (!digits) return null;
-  const withCountryCode = digits.length === 10 ? `91${digits}` : digits;
-  return `${withCountryCode}@s.whatsapp.net`;
+  if (!phone) return null;
+  // Some members have more than one number on file (e.g. "9688502997 / 8072006482") -
+  // send to the first one that looks valid instead of concatenating all the digits together
+  const candidates = String(phone).split(/[/,]|\s+(?:or|and)\s+/i);
+  for (const candidate of candidates) {
+    const digits = candidate.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      const withCountryCode = digits.length === 10 ? `91${digits}` : digits;
+      return `${withCountryCode}@s.whatsapp.net`;
+    }
+  }
+  return null;
 }
 
 async function sendMessage(phone, text) {
