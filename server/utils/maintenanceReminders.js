@@ -13,8 +13,6 @@ function baseUrl() {
   return 'http://localhost:3000';
 }
 
-// Computed in India time regardless of the server's own timezone, so the reminder day/time always
-// lines up with the association's actual calendar day and clock.
 function nowIST() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -29,11 +27,6 @@ function nowIST() {
   return { year: Number(map.year), month: Number(map.month), day: Number(map.day), hour: Number(map.hour), minute: Number(map.minute) };
 }
 
-// Sends a WhatsApp reminder to every member with an unpaid/partial due for the current month, on
-// the admin-configured days/time (general_settings.reminder_days / reminder_time, India time), at
-// most once per calendar day (guarded via general_settings.reminders_last_sent_date). Never throws
-// - a failed run must not crash the scheduler that calls this. force:true (the admin's "Resend
-// Today" action) bypasses the day/time/already-sent guards but still only sends once per call.
 async function sendDailyReminders({ force = false } = {}) {
   if (!whatsapp.isConnected()) {
     return { skipped: true, reason: 'WhatsApp is not linked yet. Scan the QR code in General Settings.' };
@@ -92,14 +85,12 @@ async function sendDailyReminders({ force = false } = {}) {
     }
     const remaining = Number(due.amount_due) - Number(due.amount_paid);
     const link = `${baseUrl()}/pay-monthly-maintenance?q=${encodeURIComponent(due.site_no || due.name)}`;
-    // The hand-built "Pay Now" button message (sendPaymentMessage) doesn't render on any WhatsApp
-    // client - confirmed broken on both WhatsApp Web and the phone app. Plain text with an
-    // auto-linkified URL is the only format that reliably delivers here.
+    
     const message =
-      `Hi ${due.name}, this is a reminder that your maintenance due of ₹${remaining} ` +
-      `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'}) is still pending.\n\n` +
-      `*Pay Now:* ${link}\n\n- ${appName}`;
-
+      `*Hi ${due.name},*  This is a reminder that your maintenance due of *₹${remaining} ` +
+      `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'})* is still pending.\n\n` +
+      `*Pay Now:* ${link}\n\n` +
+      ` ~ *Sri Balamurugan Nagar Welfare Association* ~ `;
     try {
       await whatsapp.sendMessage(due.phone, message);
       sent.push(due.name);
