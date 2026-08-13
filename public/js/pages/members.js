@@ -27,8 +27,8 @@ window.MembersPage = {
           }
         </div>
         <table>
-          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Joined</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="9">Loading…</td></tr></tbody>
+          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Joined</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="8">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -172,7 +172,7 @@ window.MembersPage = {
     const members = await Api.get('/members');
     const rows = document.getElementById('rows');
     if (!members.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No members yet</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="8">No members yet</td></tr>`;
       return;
     }
     rows.innerHTML = members
@@ -184,7 +184,6 @@ window.MembersPage = {
         <td>${Util.escapeHtml(m.name)}</td>
         <td>${Util.escapeHtml(m.phone || '-')}</td>
         <td>${Util.escapeHtml(m.email || '-')}</td>
-        <td>${Util.escapeHtml(m.address || '-')}</td>
         <td>${m.join_date || '-'}</td>
         <td><span class="badge ${m.status}">${m.status}</span></td>
         ${
