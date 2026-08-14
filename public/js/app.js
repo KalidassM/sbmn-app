@@ -86,7 +86,7 @@ const NAV_ITEMS = [
   { path: '#/users', label: 'Login Accounts', icon: 'bi-shield-lock', adminOnly: true },
   { path: '#/payment-settings', label: 'Payment Settings', icon: 'bi-credit-card', superAdminOnly: true },
   { path: '#/general-settings', label: 'General Settings', icon: 'bi-gear', superAdminOnly: true },
-  { path: '#/activity-log', label: 'Activity Log', icon: 'bi-clock-history', adminOnly: true },
+  { path: '#/activity-log', label: 'Activity Log', icon: 'bi-clock-history', adminOnly: true }, 
 ];
 
 const PAGES = {
