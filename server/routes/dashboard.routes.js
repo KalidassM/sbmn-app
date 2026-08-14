@@ -30,8 +30,10 @@ router.get('/summary', requireAuth, (req, res) => {
     .get(now.getMonth() + 1, now.getFullYear()).s;
   const totalMaintenanceDue = db
     .prepare(
-      `SELECT COALESCE(SUM(amount_due - amount_paid), 0) AS s FROM maintenance_payments
-       WHERE status != 'paid' AND month = ? AND year = ?`
+      `SELECT COALESCE(SUM(mp.amount_due - mp.amount_paid), 0) AS s
+       FROM maintenance_payments mp
+       JOIN members m ON m.id = mp.member_id
+       WHERE mp.status != 'paid' AND mp.month = ? AND mp.year = ? AND m.status = 'active'`
     )
     .get(now.getMonth() + 1, now.getFullYear()).s;
 
