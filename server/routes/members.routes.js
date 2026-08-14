@@ -102,11 +102,15 @@ router.put('/bulk-status', requireAuth, requireAdmin, (req, res) => {
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Member not found' });
-  const { name, site_no, address, phone, email, join_date, status } = req.body || {};
+  const { name, site_no, address, phone, email, join_date, status, inactive_date } = req.body || {};
   const finalStatus = status ?? existing.status;
   let inactiveDate = existing.inactive_date;
-  if (finalStatus === 'inactive' && existing.status !== 'inactive') {
-    inactiveDate = new Date().toISOString().slice(0, 10);
+  if (finalStatus === 'inactive') {
+    if (inactive_date) {
+      inactiveDate = inactive_date;
+    } else if (existing.status !== 'inactive') {
+      inactiveDate = new Date().toISOString().slice(0, 10);
+    }
   } else if (finalStatus === 'active') {
     inactiveDate = null;
   }

@@ -265,6 +265,10 @@ window.MembersPage = {
               <option value="inactive" ${member?.status === 'inactive' ? 'selected' : ''}>Inactive</option>
             </select>
           </div>
+          <div class="field" id="inactiveDateField" style="display:${member?.status === 'inactive' ? '' : 'none'}">
+            <label>Inactive Since</label>
+            <input id="f_inactive_date" type="date" value="${member?.inactive_date || ''}" />
+          </div>
         </div>
         <div class="toolbar mt-16">
           <button type="submit">${isEdit ? 'Save Changes' : 'Add Member'}</button>
@@ -272,6 +276,10 @@ window.MembersPage = {
         </div>
       </form>
     `;
+
+    document.getElementById('f_status').addEventListener('change', (e) => {
+      document.getElementById('inactiveDateField').style.display = e.target.value === 'inactive' ? '' : 'none';
+    });
 
     document.getElementById('memberForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -283,6 +291,7 @@ window.MembersPage = {
         address: document.getElementById('f_address').value.trim(),
         join_date: document.getElementById('f_join').value,
         status: document.getElementById('f_status').value,
+        inactive_date: document.getElementById('f_inactive_date').value || null,
       };
       try {
         if (isEdit) {
