@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { requireAuth, requireAdmin, requireSuperAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -28,6 +29,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
       .prepare('INSERT INTO users (username, password_hash, role, member_id) VALUES (?, ?, ?, ?)')
       .run(username, hash, finalRole, member_id || null);
     const row = db.prepare('SELECT id, username, role, member_id FROM users WHERE id = ?').get(info.lastInsertRowid);
+    logActivity({
+      actor: req.user?.username,
+      action: 'create',
+      entityType: 'user',
+      entityId: row.id,
+      description: `Created user ${row.username} (role: ${row.role})`,
+    });
     res.status(201).json(row);
   } catch (err) {
     res.status(400).json({ error: 'Username already exists' });
@@ -41,6 +49,13 @@ router.put('/:id/reset-password', requireAuth, requireSuperAdmin, (req, res) => 
   if (!existing) return res.status(404).json({ error: 'User not found' });
   const hash = bcrypt.hashSync(password, 10);
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'user',
+    entityId: existing.id,
+    description: `Reset password for user ${existing.username}`,
+  });
   res.json({ ok: true });
 });
 
@@ -49,6 +64,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'User not found' });
   if (existing.username === 'admin') return res.status(400).json({ error: 'Cannot delete the default admin account' });
   db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'user',
+    entityId: existing.id,
+    description: `Deleted user ${existing.username} (role: ${existing.role})`,
+  });
   res.json({ ok: true });
 });
 

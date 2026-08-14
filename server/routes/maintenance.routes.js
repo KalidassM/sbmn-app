@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
 const { notifyAdminOfPayment } = require('../utils/paymentNotify');
 const { sendDailyReminders } = require('../utils/maintenanceReminders');
@@ -50,6 +51,12 @@ router.post('/payments/bulk-mark-paid', requireAuth, requireAdmin, (req, res) =>
       updated += update.run(today, id).changes;
     });
   })(ids);
+  logActivity({
+    actor: req.user?.username,
+    action: 'payment',
+    entityType: 'maintenance_payment',
+    description: `Bulk marked ${updated} of ${ids.length} selected due(s) as paid (ids: ${ids.join(', ')})`,
+  });
   res.json({ updated });
 });
 
@@ -112,6 +119,14 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
   if (finalAmountPaid > existing.amount_paid) {
     notifyAdminOfPayment(row);
   }
+  const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(row.member_id);
+  logActivity({
+    actor: req.user?.username,
+    action: finalAmountPaid > existing.amount_paid ? 'payment' : 'update',
+    entityType: 'maintenance_payment',
+    entityId: row.id,
+    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) - ${row.month}/${row.year} maintenance set to ${finalStatus}, paid ₹${finalAmountPaid} of ₹${finalAmountDue}`,
+  });
   res.json(row);
 });
 
@@ -119,6 +134,14 @@ router.delete('/payments/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Payment record not found' });
   db.prepare('DELETE FROM maintenance_payments WHERE id = ?').run(req.params.id);
+  const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(existing.member_id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'maintenance_payment',
+    entityId: existing.id,
+    description: `Deleted ${member?.name || 'member'} (Site No ${member?.site_no || '-'})'s maintenance due for ${existing.month}/${existing.year}`,
+  });
   res.json({ ok: true });
 });
 

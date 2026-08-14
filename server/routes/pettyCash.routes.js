@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -55,6 +56,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 
   const id = tx();
   const row = db.prepare('SELECT * FROM petty_cash_transactions WHERE id = ?').get(id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'petty_cash',
+    entityId: row.id,
+    description: `Added ${row.type} of ₹${row.amount} - ${row.description}`,
+  });
   res.status(201).json({ transaction: row, summary: computeSummary() });
 });
 
@@ -89,6 +97,13 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   })();
 
   const row = db.prepare('SELECT * FROM petty_cash_transactions WHERE id = ?').get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'petty_cash',
+    entityId: row.id,
+    description: `Updated ${row.type} of ₹${row.amount} - ${row.description}`,
+  });
   res.json({ transaction: row, summary: computeSummary() });
 });
 
@@ -104,6 +119,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   });
   tx();
 
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'petty_cash',
+    entityId: existing.id,
+    description: `Deleted ${existing.type} of ₹${existing.amount} - ${existing.description}`,
+  });
   res.json({ ok: true, summary: computeSummary() });
 });
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { notifyAdminOfPayment } = require('../utils/paymentNotify');
 
@@ -94,6 +95,14 @@ router.post('/verify', requireAuth, (req, res) => {
 
   const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
   notifyAdminOfPayment(updated);
+  const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updated.member_id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'payment',
+    entityType: 'maintenance_payment',
+    entityId: updated.id,
+    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${updated.amount_paid} online for ${updated.month}/${updated.year}`,
+  });
   res.json({ ok: true, payment: updated });
 });
 

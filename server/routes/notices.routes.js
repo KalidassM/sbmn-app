@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -18,6 +19,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     .prepare('INSERT INTO notices (title, body, pinned) VALUES (?, ?, ?)')
     .run(title.trim().slice(0, 80), body.trim().slice(0, 400), pinned ? 1 : 0);
   const row = db.prepare('SELECT * FROM notices WHERE id = ?').get(info.lastInsertRowid);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'notice',
+    entityId: row.id,
+    description: `Added notice ${row.title}`,
+  });
   res.status(201).json(row);
 });
 
@@ -32,6 +40,13 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     req.params.id
   );
   const row = db.prepare('SELECT * FROM notices WHERE id = ?').get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'notice',
+    entityId: row.id,
+    description: `Updated notice ${row.title}`,
+  });
   res.json(row);
 });
 
@@ -39,6 +54,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM notices WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Notice not found' });
   db.prepare('DELETE FROM notices WHERE id = ?').run(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'notice',
+    entityId: existing.id,
+    description: `Deleted notice ${existing.title}`,
+  });
   res.json({ ok: true });
 });
 

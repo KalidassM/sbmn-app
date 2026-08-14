@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -29,6 +30,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     )
     .run(member_id, designation, start_date || null, end_date || null, notes || null, photo || null);
   const row = db.prepare(`${SELECT_JOIN} WHERE cm.id = ?`).get(info.lastInsertRowid);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'core_member',
+    entityId: row.id,
+    description: `Added core member ${row.member_name} as ${row.designation}`,
+  });
   res.status(201).json(row);
 });
 
@@ -47,13 +55,27 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     req.params.id
   );
   const row = db.prepare(`${SELECT_JOIN} WHERE cm.id = ?`).get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'core_member',
+    entityId: row.id,
+    description: `Updated core member ${row.member_name} (${row.designation})`,
+  });
   res.json(row);
 });
 
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
-  const existing = db.prepare('SELECT * FROM core_members WHERE id = ?').get(req.params.id);
+  const existing = db.prepare(`${SELECT_JOIN} WHERE cm.id = ?`).get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Core member record not found' });
   db.prepare('DELETE FROM core_members WHERE id = ?').run(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'core_member',
+    entityId: existing.id,
+    description: `Removed core member ${existing.member_name} (${existing.designation})`,
+  });
   res.json({ ok: true });
 });
 

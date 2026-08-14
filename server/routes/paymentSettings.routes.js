@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 const { buildUpiQr } = require('../utils/upiQr');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -37,6 +38,12 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
     razorpay_key_secret ? razorpay_key_secret : existing.razorpay_key_secret
   );
   const row = db.prepare('SELECT * FROM payment_settings WHERE id = 1').get();
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'payment_settings',
+    description: 'Updated payment settings',
+  });
   res.json(toPublicSettings(row));
 });
 

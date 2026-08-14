@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -29,6 +30,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     )
     .run(title, description || null, event_date, venue || null);
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(info.lastInsertRowid);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'event',
+    entityId: event.id,
+    description: `Added event ${event.title} (${event.event_date})`,
+  });
   res.status(201).json(event);
 });
 
@@ -46,6 +54,13 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     req.params.id
   );
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'event',
+    entityId: event.id,
+    description: `Updated event ${event.title} (${event.event_date})`,
+  });
   res.json(event);
 });
 
@@ -53,6 +68,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Event not found' });
   db.prepare('DELETE FROM events WHERE id = ?').run(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'event',
+    entityId: existing.id,
+    description: `Deleted event ${existing.title} (${existing.event_date})`,
+  });
   res.json({ ok: true });
 });
 

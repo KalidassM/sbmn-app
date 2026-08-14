@@ -137,6 +137,16 @@ CREATE TABLE IF NOT EXISTS general_settings (
   maintenance_amount REAL,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS activity_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor TEXT,
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id INTEGER,
+  description TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
 `);
 
 db.prepare('INSERT OR IGNORE INTO payment_settings (id) VALUES (1)').run();

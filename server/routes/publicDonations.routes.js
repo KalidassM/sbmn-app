@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { logActivity } = require('../utils/activityLog');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
 
@@ -30,6 +31,13 @@ router.post('/', (req, res) => {
        VALUES (?, ?, ?, ?, ?, 'pending', 'public')`
     )
     .run(name.slice(0, 120), (donor_email || '').toString().trim().slice(0, 160) || null, (donor_phone || '').toString().trim().slice(0, 32) || null, amount, (purpose || '').toString().trim().slice(0, 200) || null);
+  logActivity({
+    actor: 'public',
+    action: 'create',
+    entityType: 'donation',
+    entityId: info.lastInsertRowid,
+    description: `${name} pledged a donation of ₹${Number(amount)}${purpose ? ` for ${purpose}` : ''}`,
+  });
   res.status(201).json({ id: info.lastInsertRowid, donor_name: name, amount: Number(amount) });
 });
 
@@ -106,6 +114,13 @@ router.post('/:id/verify', (req, res) => {
     `UPDATE donations SET status = 'completed', razorpay_payment_id = ?, donation_date = date('now') WHERE id = ?`
   ).run(razorpay_payment_id, donation.id);
 
+  logActivity({
+    actor: 'public',
+    action: 'payment',
+    entityType: 'donation',
+    entityId: donation.id,
+    description: `${donation.donor_name} paid ₹${donation.amount} donation online${donation.purpose ? ` for ${donation.purpose}` : ''}`,
+  });
   res.json({ ok: true });
 });
 

@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { logActivity } = require('../utils/activityLog');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
@@ -148,6 +149,15 @@ router.post('/pay-multiple/verify', (req, res) => {
     const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(d.id);
     notifyAdminOfPayment(updated);
   });
+  const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(dues[0].member_id);
+  const total = dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
+  const months = dues.map((d) => `${d.month}/${d.year}`).join(', ');
+  logActivity({
+    actor: 'public',
+    action: 'payment',
+    entityType: 'maintenance_payment',
+    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${total} online for ${dues.length} month(s): ${months} (due ids: ${dues.map((d) => d.id).join(', ')})`,
+  });
   res.json({ ok: true });
 });
 
@@ -213,6 +223,14 @@ router.post('/:id/verify', (req, res) => {
 
   const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
   notifyAdminOfPayment(updated);
+  const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updated.member_id);
+  logActivity({
+    actor: 'public',
+    action: 'payment',
+    entityType: 'maintenance_payment',
+    entityId: updated.id,
+    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${updated.amount_paid} online for ${updated.month}/${updated.year}`,
+  });
   res.json({ ok: true });
 });
 

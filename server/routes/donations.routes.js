@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -29,6 +30,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     )
     .run(member_id || null, donor_name || null, amount, donation_date || null, purpose || null, event_id || null);
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(info.lastInsertRowid);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'donation',
+    entityId: row.id,
+    description: `Added donation of ₹${row.amount} from ${row.donor_name || row.member_name || 'member'}`,
+  });
   res.status(201).json(row);
 });
 
@@ -49,6 +57,13 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     req.params.id
   );
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'donation',
+    entityId: row.id,
+    description: `Updated donation of ₹${row.amount} from ${row.donor_name || row.member_name || 'member'}`,
+  });
   res.json(row);
 });
 
@@ -56,6 +71,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM donations WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Donation not found' });
   db.prepare('DELETE FROM donations WHERE id = ?').run(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'donation',
+    entityId: existing.id,
+    description: `Deleted donation of ₹${existing.amount} from ${existing.donor_name || 'member ID ' + existing.member_id}`,
+  });
   res.json({ ok: true });
 });
 
@@ -75,6 +97,13 @@ router.post('/self', requireAuth, (req, res) => {
     )
     .run(req.user.member_id, amount, purpose || null, event_id || null);
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(info.lastInsertRowid);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'donation',
+    entityId: row.id,
+    description: `Started self donation of ₹${row.amount} (pending payment)`,
+  });
   res.status(201).json(row);
 });
 
@@ -147,6 +176,13 @@ router.post('/self/:id/verify', requireAuth, (req, res) => {
   ).run(razorpay_payment_id, donation.id);
 
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(donation.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'donation',
+    entityId: row.id,
+    description: `Online payment verified for donation of ₹${row.amount} from ${row.donor_name || row.member_name || 'member'}`,
+  });
   res.json({ ok: true, donation: row });
 });
 
@@ -159,6 +195,13 @@ router.put('/:id/confirm', requireAuth, requireAdmin, (req, res) => {
   }
   db.prepare("UPDATE donations SET status = 'completed', donation_date = date('now') WHERE id = ?").run(req.params.id);
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'donation',
+    entityId: row.id,
+    description: `Confirmed UPI donation of ₹${row.amount} from ${row.donor_name || row.member_name || 'member'}`,
+  });
   res.json(row);
 });
 

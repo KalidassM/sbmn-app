@@ -1,6 +1,8 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
+const { notifyMember, welcomeMessage } = require('../utils/memberNotify');
 
 const router = express.Router();
 
@@ -15,7 +17,7 @@ router.get('/:id', requireAuth, (req, res) => {
   res.json(member);
 });
 
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requireAdmin, async (req, res) => {
   const { name, site_no, address, phone, email, join_date, status } = req.body || {};
   if (!name) return res.status(400).json({ error: 'Name is required' });
   const info = db
@@ -25,6 +27,14 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     )
     .run(name, site_no || null, address || null, phone || null, email || null, join_date || null, status || null);
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(info.lastInsertRowid);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'member',
+    entityId: member.id,
+    description: `Added member ${member.name} (Site No ${member.site_no || '-'})`,
+  });
+  await notifyMember(member, welcomeMessage(member));
   res.status(201).json(member);
 });
 
@@ -77,6 +87,12 @@ router.post('/bulk', requireAuth, requireAdmin, (req, res) => {
     });
   })(members);
 
+  logActivity({
+    actor: req.user?.username,
+    action: 'bulk_upload',
+    entityType: 'member',
+    description: `Bulk upload: ${inserted} added, ${updated} updated, ${skipped.length} skipped`,
+  });
   res.json({ inserted, updated, skipped });
 });
 
@@ -87,15 +103,28 @@ router.put('/bulk-status', requireAuth, requireAdmin, (req, res) => {
   if (!['active', 'inactive'].includes(status)) return res.status(400).json({ error: 'status must be active or inactive' });
 
   const today = new Date().toISOString().slice(0, 10);
+  const getMember = db.prepare('SELECT * FROM members WHERE id = ?');
   const update = db.prepare(
     `UPDATE members SET status = ?, inactive_date = ? WHERE id = ?`
   );
   let updated = 0;
+  const changedMembers = [];
   db.transaction((rowIds) => {
     rowIds.forEach((id) => {
-      updated += update.run(status, status === 'inactive' ? today : null, id).changes;
+      const existing = getMember.get(id);
+      if (!existing) return;
+      const result = update.run(status, status === 'inactive' ? today : null, id);
+      updated += result.changes;
+      if (result.changes && existing.status !== status) changedMembers.push(existing);
     });
   })(ids);
+
+  logActivity({
+    actor: req.user?.username,
+    action: 'status_change',
+    entityType: 'member',
+    description: `Bulk status change: ${changedMembers.length} member(s) set to ${status} (${changedMembers.map((m) => m.name).join(', ') || 'none'})`,
+  });
   res.json({ updated });
 });
 
@@ -129,6 +158,16 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     req.params.id
   );
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: finalStatus !== existing.status ? 'status_change' : 'update',
+    entityType: 'member',
+    entityId: member.id,
+    description:
+      finalStatus !== existing.status
+        ? `Set ${member.name} (Site No ${member.site_no || '-'}) to ${finalStatus}`
+        : `Updated member ${member.name} (Site No ${member.site_no || '-'})`,
+  });
   res.json(member);
 });
 
@@ -136,6 +175,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Member not found' });
   db.prepare('DELETE FROM members WHERE id = ?').run(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'member',
+    entityId: existing.id,
+    description: `Deleted member ${existing.name} (Site No ${existing.site_no || '-'})`,
+  });
   res.json({ ok: true });
 });
 

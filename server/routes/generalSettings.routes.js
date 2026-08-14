@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 const { sendMail } = require('../utils/mailer');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -77,6 +78,12 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
     finalReminderTime
   );
   const row = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'general_settings',
+    description: 'Updated general settings',
+  });
   res.json(toPublicSettings(row));
 });
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/activityLog');
 
 const router = express.Router();
 
@@ -34,6 +35,13 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     )
     .run(title, category || null, amount, expense_date || null, event_id || null, notes || null);
   const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(info.lastInsertRowid);
+  logActivity({
+    actor: req.user?.username,
+    action: 'create',
+    entityType: 'expense',
+    entityId: expense.id,
+    description: `Added expense "${expense.title}" of ₹${expense.amount}`,
+  });
   res.status(201).json(expense);
 });
 
@@ -53,6 +61,13 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     req.params.id
   );
   const expense = db.prepare('SELECT * FROM expenses WHERE id = ?').get(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'expense',
+    entityId: expense.id,
+    description: `Updated expense "${expense.title}" of ₹${expense.amount}`,
+  });
   res.json(expense);
 });
 
@@ -60,6 +75,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
   db.prepare('DELETE FROM expenses WHERE id = ?').run(req.params.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'delete',
+    entityType: 'expense',
+    entityId: existing.id,
+    description: `Deleted expense "${existing.title}" of ₹${existing.amount}`,
+  });
   res.json({ ok: true });
 });
 
