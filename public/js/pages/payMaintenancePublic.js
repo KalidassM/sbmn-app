@@ -54,65 +54,72 @@
               <p class="text-muted">No outstanding dues — you're all caught up. Thank you!</p>
             </div>`;
         }
+        const total = m.dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
         return `
           <div class="panel" style="margin-top:16px;">
             <div class="panel-header"><h3>${escapeHtml(m.name)} <span class="text-muted" style="font-size:0.8rem;">(Site No ${escapeHtml(m.site_no || '-')})</span></h3></div>
             ${m.dues.map((d) => duesRowHtml(d)).join('')}
+            <div class="toolbar" id="member-total-${m.member_id}" style="justify-content:space-between; border-top:1px solid var(--border); padding-top:12px; margin-top:12px; margin-bottom: 24px;">
+              <div>
+                <strong>Total due (${m.dues.length} month${m.dues.length > 1 ? 's' : ''})</strong>
+                <div class="text-muted" style="font-size:0.85rem;">${money(total)}</div>
+              </div>
+              <button id="pay-btn-member-${m.member_id}">Pay Now</button>
+            </div>
+            <div id="member-pay-${m.member_id}"></div>
           </div>`;
       })
       .join('');
 
-    members.forEach((m) =>
-      m.dues.forEach((d) => {
-        const btn = document.getElementById(`pay-btn-${d.id}`);
-        if (btn) btn.addEventListener('click', () => showPaymentStep(d));
-      })
-    );
+    members.forEach((m) => {
+      if (!m.dues.length) return;
+      const btn = document.getElementById(`pay-btn-member-${m.member_id}`);
+      if (btn) btn.addEventListener('click', () => showPaymentStep(m));
+    });
   }
 
   function duesRowHtml(d) {
     const remaining = Number(d.amount_due) - Number(d.amount_paid);
     return `
-      <div class="toolbar" style="justify-content:space-between; border-top:1px solid var(--border); padding-top:12px; margin-top:12px; margin-bottom: 24px;" id="due-row-${d.id}">
+      <div class="toolbar" style="justify-content:space-between; border-top:1px solid var(--border); padding-top:12px; margin-top:12px;" id="due-row-${d.id}">
         <div>
           <strong>${MONTH_NAMES[d.month]} ${d.year}</strong>
           <div class="text-muted" style="font-size:0.85rem;">${money(remaining)} due${d.status === 'partial' ? ' (partially paid)' : ''}</div>
         </div>
-        <button id="pay-btn-${d.id}">Pay Now</button>
       </div>
-      <div id="due-pay-${d.id}"></div>
     `;
   }
 
-  function showPaymentStep(due) {
-    const remaining = Number(due.amount_due) - Number(due.amount_paid);
-    const box = document.getElementById(`due-pay-${due.id}`);
-    document.getElementById(`pay-btn-${due.id}`).style.display = 'none';
+  function showPaymentStep(m) {
+    const remaining = m.dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
+    const box = document.getElementById(`member-pay-${m.member_id}`);
+    document.getElementById(`pay-btn-member-${m.member_id}`).style.display = 'none';
     box.innerHTML = `
-      <div id="gatewayContent-${due.id}"></div>
-      <div id="qrContent-${due.id}"></div>
+      <div id="gatewayContent-member-${m.member_id}"></div>
+      <div id="qrContent-member-${m.member_id}"></div>
     `;
 
     request('/razorpay-config')
       .then((config) => {
-        const gatewayBox = document.getElementById(`gatewayContent-${due.id}`);
+        const gatewayBox = document.getElementById(`gatewayContent-member-${m.member_id}`);
         if (config.configured) {
-          gatewayBox.innerHTML = `<button id="payOnlineBtn-${due.id}" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-          document.getElementById(`payOnlineBtn-${due.id}`).addEventListener('click', () => payWithRazorpay(due, remaining));
+          gatewayBox.innerHTML = `<button id="payOnlineBtn-member-${m.member_id}" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
+          document.getElementById(`payOnlineBtn-member-${m.member_id}`).addEventListener('click', () => payWithRazorpay(m, remaining));
         } else {
-          loadQr(due, remaining);
+          loadQr(m, remaining);
         }
       })
       .catch((err) => {
-        document.getElementById(`gatewayContent-${due.id}`).innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
+        document.getElementById(`gatewayContent-member-${m.member_id}`).innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
       });
   }
 
-  async function loadQr(due, remaining) {
-    const qrBox = document.getElementById(`qrContent-${due.id}`);
+  async function loadQr(m, remaining) {
+    const qrBox = document.getElementById(`qrContent-member-${m.member_id}`);
     qrBox.innerHTML = '<p class="text-muted">Loading QR code…</p>';
     try {
-      const note = `Maintenance ${MONTH_NAMES[due.month]} ${due.year}`;
+      const months = m.dues.map((d) => `${MONTH_NAMES[d.month]} ${d.year}`).join(', ');
+      const note = `Maintenance ${months}`;
       const data = await request(`/qr?amount=${remaining}&note=${encodeURIComponent(note)}`);
       qrBox.innerHTML = `
         <img src="${data.qrDataUrl}" alt="UPI QR code" width="220" height="220" />
@@ -124,39 +131,45 @@
     }
   }
 
-  async function payWithRazorpay(due, remaining) {
-    const gatewayBox = document.getElementById(`gatewayContent-${due.id}`);
+  async function payWithRazorpay(m, remaining) {
+    const gatewayBox = document.getElementById(`gatewayContent-member-${m.member_id}`);
+    const dueIds = m.dues.map((d) => d.id);
     try {
-      const order = await request(`/${due.id}/order`, { method: 'POST' });
+      const order = await request('/pay-multiple/order', { method: 'POST', body: { dueIds } });
+      const months = m.dues.map((d) => `${MONTH_NAMES[d.month]} ${d.year}`).join(', ');
       const rzp = new Razorpay({
         key: order.keyId,
         amount: order.amount,
         currency: order.currency,
         name: order.payeeName,
-        description: `Maintenance ${MONTH_NAMES[due.month]} ${due.year}`,
+        description: `Maintenance ${months}`,
         order_id: order.orderId,
         handler: async (response) => {
           gatewayBox.innerHTML = '<p class="text-muted">Verifying payment…</p>';
           try {
-            await request(`/${due.id}/verify`, {
+            await request('/pay-multiple/verify', {
               method: 'POST',
               body: {
+                dueIds,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               },
             });
-            const row = document.getElementById(`due-row-${due.id}`);
-            row.innerHTML = `<div><strong>${MONTH_NAMES[due.month]} ${due.year}</strong><div class="text-muted">Paid — thank you! 🙏</div></div>`;
-            document.getElementById(`due-pay-${due.id}`).innerHTML = '';
+            m.dues.forEach((d) => {
+              const row = document.getElementById(`due-row-${d.id}`);
+              if (row) row.innerHTML = `<div><strong>${MONTH_NAMES[d.month]} ${d.year}</strong><div class="text-muted">Paid — thank you! 🙏</div></div>`;
+            });
+            document.getElementById(`member-total-${m.member_id}`).innerHTML = '<div class="text-muted">All dues settled — thank you! 🙏</div>';
+            document.getElementById(`member-pay-${m.member_id}`).innerHTML = '';
           } catch (err) {
             gatewayBox.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
           }
         },
         modal: {
           ondismiss: () => {
-            gatewayBox.innerHTML = `<button id="payOnlineBtn-${due.id}" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-            document.getElementById(`payOnlineBtn-${due.id}`).addEventListener('click', () => payWithRazorpay(due, remaining));
+            gatewayBox.innerHTML = `<button id="payOnlineBtn-member-${m.member_id}" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
+            document.getElementById(`payOnlineBtn-member-${m.member_id}`).addEventListener('click', () => payWithRazorpay(m, remaining));
           },
         },
         theme: { color: '#2f6f4e' },
