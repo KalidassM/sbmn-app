@@ -16,7 +16,15 @@ router.get('/payments', requireAuth, (req, res) => {
 
   let sql = `SELECT mp.*, m.name AS member_name, m.site_no, m.phone FROM maintenance_payments mp
              JOIN members m ON m.id = mp.member_id`;
-  const clauses = [`m.status = 'active'`];
+  // A currently-active member shows for every due. An inactive member only shows for dues from
+  // before the month they went inactive in (e.g. active through July, inactive from August 5th ->
+  // still shows on the July due, hidden from August onward) - a member with no inactive_date on
+  // record has no way to know which months they were active for, so stays hidden everywhere.
+  // Symmetrically, a member never shows for a due from before the month they joined in.
+  const clauses = [
+    `(m.status = 'active' OR (m.inactive_date IS NOT NULL AND (mp.year * 100 + mp.month) < (CAST(strftime('%Y', m.inactive_date) AS INTEGER) * 100 + CAST(strftime('%m', m.inactive_date) AS INTEGER))))`,
+    `(mp.year * 100 + mp.month) >= (CAST(strftime('%Y', m.join_date) AS INTEGER) * 100 + CAST(strftime('%m', m.join_date) AS INTEGER))`,
+  ];
   const params = [];
   if (month) {
     clauses.push('mp.month = ?');

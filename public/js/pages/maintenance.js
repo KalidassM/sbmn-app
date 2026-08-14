@@ -14,6 +14,8 @@ window.MaintenancePage = {
       ${!isAdmin ? `<p class="page-sub" style="margin-top:-14px;">Want to pay online yourself? Visit <a href="/pay-monthly-maintenance" target="_blank">the maintenance payment page</a>.</p>` : ''}
       <div id="alertBox"></div>
 
+      <div class="stat-grid" id="monthSummary"></div>
+
       <div class="panel">
         <div class="panel-header">
           <h3>Maintenance Dues</h3>
@@ -86,7 +88,19 @@ window.MaintenancePage = {
     }
     this.currentPayments = payments;
     this.selectedIds.clear();
+    this.renderSummary();
     this.renderRows();
+  },
+
+  renderSummary() {
+    const box = document.getElementById('monthSummary');
+    if (!box) return;
+    const totalPaid = this.currentPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+    const totalPending = this.currentPayments.reduce((sum, p) => sum + (Number(p.amount_due) - Number(p.amount_paid)), 0);
+    box.innerHTML = `
+      <div class="stat-card"><div class="label">Paid (${Util.monthName(this.state.month)} ${this.state.year})</div><div class="value">${Util.money(totalPaid)}</div></div>
+      <div class="stat-card ${totalPending > 0 ? 'negative' : ''}"><div class="label">Not Paid (${Util.monthName(this.state.month)} ${this.state.year})</div><div class="value">${Util.money(totalPending)}</div></div>
+    `;
   },
 
   async bulkMarkPaid() {

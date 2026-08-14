@@ -47,6 +47,13 @@
     alertBox.innerHTML = '';
     resultsBox.innerHTML = members
       .map((m) => {
+        if (m.inactive) {
+          return `
+            <div class="panel" style="margin-top:16px;">
+              <div class="panel-header"><h3>${escapeHtml(m.name)} <span class="text-muted" style="font-size:0.8rem;">(Site No ${escapeHtml(m.site_no || '-')})</span></h3></div>
+              <p class="text-muted">You're not an active member, so there's nothing to pay online here. Please contact the association if you believe this is a mistake.</p>
+            </div>`;
+        }
         if (!m.dues.length) {
           return `
             <div class="panel" style="margin-top:16px;">

@@ -7,7 +7,16 @@ function ensureDuesGenerated(month, year) {
   const settings = db.prepare('SELECT maintenance_amount FROM general_settings WHERE id = 1').get();
   if (!settings || !settings.maintenance_amount) return;
 
-  const members = db.prepare("SELECT id FROM members WHERE status = 'active'").all();
+  // Skip members who hadn't joined yet as of this month/year - no due should exist for a period
+  // before someone became a member.
+  const period = year * 100 + month;
+  const members = db
+    .prepare(
+      `SELECT id FROM members
+       WHERE status = 'active'
+         AND (CAST(strftime('%Y', join_date) AS INTEGER) * 100 + CAST(strftime('%m', join_date) AS INTEGER)) <= ?`
+    )
+    .all(period);
   const insert = db.prepare(
     `INSERT INTO maintenance_payments (member_id, month, year, amount_due, amount_paid, status)
      VALUES (?, ?, ?, ?, 0, 'unpaid')

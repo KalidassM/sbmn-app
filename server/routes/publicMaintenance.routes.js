@@ -12,10 +12,10 @@ const router = express.Router();
 function findMembers(query) {
   const q = (query || '').toString().trim();
   if (!q) return [];
-  const bySiteNo = db.prepare('SELECT id, name, site_no FROM members WHERE site_no = ? COLLATE NOCASE').get(q);
+  const bySiteNo = db.prepare('SELECT id, name, site_no, status FROM members WHERE site_no = ? COLLATE NOCASE').get(q);
   if (bySiteNo) return [bySiteNo];
   if (q.length < 3) return [];
-  return db.prepare('SELECT id, name, site_no FROM members WHERE name LIKE ? LIMIT 10').all(`%${q}%`);
+  return db.prepare('SELECT id, name, site_no, status FROM members WHERE name LIKE ? LIMIT 10').all(`%${q}%`);
 }
 
 router.get('/dues', (req, res) => {
@@ -23,10 +23,16 @@ router.get('/dues', (req, res) => {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-  if (members.length) {
+  const activeMembers = members.filter((m) => m.status === 'active');
+  if (activeMembers.length) {
     ensureDuesGenerated(currentMonth, currentYear);
   }
   const results = members.map((m) => {
+    if (m.status !== 'active') {
+      // Inactive members can't pay online here - no dues are surfaced, just the member/site so
+      // the client can show a plain "you're not an active member" message instead of a due list.
+      return { member_id: m.id, name: m.name, site_no: m.site_no, inactive: true, dues: [] };
+    }
     // Show the current month plus any missed past months (arrears) - never a future month's due
     const dues = db
       .prepare(
@@ -36,15 +42,19 @@ router.get('/dues', (req, res) => {
          ORDER BY year, month`
       )
       .all(m.id, currentYear, currentYear, currentMonth);
-    return { member_id: m.id, name: m.name, site_no: m.site_no, dues };
+    return { member_id: m.id, name: m.name, site_no: m.site_no, inactive: false, dues };
   });
   res.json(results);
 });
+
+const INACTIVE_MESSAGE = "You're not an active member, so this due can't be paid online. Please contact the association.";
 
 function loadPendingDue(dueId) {
   const due = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(dueId);
   if (!due) return { error: 404, message: 'Due record not found' };
   if (due.status === 'paid') return { error: 400, message: 'This due is already fully paid' };
+  const member = db.prepare('SELECT status FROM members WHERE id = ?').get(due.member_id);
+  if (member?.status !== 'active') return { error: 403, message: INACTIVE_MESSAGE };
   return { due };
 }
 
@@ -58,6 +68,8 @@ function loadPendingDues(ids) {
   if (dues.some((d) => d.status === 'paid')) return { error: 400, message: 'One or more dues are already fully paid' };
   const memberId = dues[0].member_id;
   if (dues.some((d) => d.member_id !== memberId)) return { error: 400, message: 'Dues must belong to the same member' };
+  const member = db.prepare('SELECT status FROM members WHERE id = ?').get(memberId);
+  if (member?.status !== 'active') return { error: 403, message: INACTIVE_MESSAGE };
   return { dues };
 }
 
