@@ -22,7 +22,6 @@ window.ExpensesPage = {
 
       <div class="panel">
         <div class="panel-header"><h3>Petty Cash</h3></div>
-        <p class="page-sub" style="margin-top:-8px;">Small day-to-day cash kept on hand. Top-ups move money from the bank into the cash box; expenses spend from it and automatically also appear in the Expenses list above.</p>
         <div class="stat-grid" id="pettyCashStats"></div>
         ${isAdmin ? '<div id="pettyCashForm"></div>' : ''}
         <table>

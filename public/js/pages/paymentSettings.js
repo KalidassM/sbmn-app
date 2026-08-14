@@ -20,11 +20,6 @@ window.PaymentSettingsPage = {
 
       <div class="panel">
         <div class="panel-header"><h3>Online Payment Gateway (Razorpay)</h3><span id="gatewayStatus"></span></div>
-        <p class="text-muted" style="margin-top:-6px;">
-          Sign up at <strong>razorpay.com</strong>, link your SBI current account for settlement in their dashboard,
-          then paste the API keys from Settings &rarr; API Keys below. Once set, members get a "Pay Online Now" button
-          that confirms payment automatically &mdash; no manual "Mark Paid" step needed.
-        </p>
         <form id="gatewayForm">
           <div class="form-grid">
             <div class="field"><label>Key ID</label><input id="s_rp_key_id" placeholder="rzp_live_xxxxxxxxxxxx" /></div>

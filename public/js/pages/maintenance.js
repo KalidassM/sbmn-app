@@ -112,10 +112,22 @@ window.MaintenancePage = {
     const user = Api.getUser();
     const isAdmin = Util.isAdmin(user);
     const filter = this.state.statusFilter;
-    const statusRank = { paid: 0, partial: 1, unpaid: 2 };
+    const statusRank = { paid: 0, partial: 1, unpaid: 1 };
+    // Matches the CAST(site_no AS INTEGER), site_no ordering used for Members - a fixed per-item
+    // key (not a per-pair numeric/string decision), so the sort stays consistent even when some
+    // Site Nos are plain numbers and others are alphanumeric (e.g. "12A").
+    const siteNoNumericKey = (siteNo) => {
+      const n = parseInt(siteNo, 10);
+      return Number.isNaN(n) ? 0 : n;
+    };
     const payments = (filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter))
       .slice()
-      .sort((a, b) => statusRank[a.status] - statusRank[b.status]);
+      .sort(
+        (a, b) =>
+          statusRank[a.status] - statusRank[b.status] ||
+          siteNoNumericKey(a.site_no) - siteNoNumericKey(b.site_no) ||
+          String(a.site_no || '').localeCompare(String(b.site_no || ''))
+      );
 
     const rows = document.getElementById('paymentRows');
     if (!payments.length) {

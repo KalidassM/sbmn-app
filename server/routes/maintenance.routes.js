@@ -75,7 +75,7 @@ router.get('/reminders', requireAuth, requireAdmin, (req, res) => {
        FROM maintenance_payments mp
        JOIN members m ON m.id = mp.member_id
        WHERE mp.month = ? AND mp.year = ? AND mp.status != 'paid' AND m.status = 'active'
-       ORDER BY m.name`
+       ORDER BY CAST(m.site_no AS INTEGER), m.site_no`
     )
     .all(month, year);
   res.json(rows);

@@ -32,10 +32,15 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
     reminder_days,
     reminder_time,
   } = req.body || {};
-  if (maintenance_amount === undefined || Number(maintenance_amount) <= 0) {
-    return res.status(400).json({ error: 'A valid maintenance amount is required' });
-  }
   const existing = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
+
+  let finalMaintenanceAmount = existing.maintenance_amount;
+  if (maintenance_amount !== undefined) {
+    if (Number.isNaN(Number(maintenance_amount)) || Number(maintenance_amount) <= 0) {
+      return res.status(400).json({ error: 'A valid maintenance amount is required' });
+    }
+    finalMaintenanceAmount = Number(maintenance_amount);
+  }
 
   let finalReminderDays = existing.reminder_days;
   if (reminder_days !== undefined) {
@@ -63,7 +68,7 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
        updated_at = datetime('now')
      WHERE id = 1`
   ).run(
-    Number(maintenance_amount),
+    finalMaintenanceAmount,
     opening_bank_balance !== undefined ? Number(opening_bank_balance) : existing.opening_bank_balance,
     opening_petty_cash_balance !== undefined ? Number(opening_petty_cash_balance) : existing.opening_petty_cash_balance,
     app_name !== undefined ? app_name || null : existing.app_name,

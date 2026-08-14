@@ -4,7 +4,8 @@ window.GeneralSettingsPage = {
       <h1>General Settings</h1>
       <p class="page-sub">Association-wide configuration</p>
       <div id="alertBox"></div>
-      <form id="settingsForm">
+
+      <form id="profileForm">
         <div class="panel">
           <div class="panel-header"><h3>Association Profile</h3></div>
           <div class="form-grid">
@@ -14,17 +15,21 @@ window.GeneralSettingsPage = {
             <div class="field"><label>Office Hours</label><input id="officeHours" placeholder="e.g. Every Sunday, 5 PM - 6 PM" /></div>
           </div>
           <div class="field"><label>Office Address</label><input id="officeAddress" placeholder="Street, area, city, PIN" /></div>
-          <p class="text-muted" style="font-size:0.85rem;">Contact Email also receives an email notification whenever a member's maintenance payment is recorded (see Email Settings below).</p>
+          <div class="toolbar mt-16"><button type="submit">Save</button></div>
         </div>
+      </form>
 
+      <form id="maintenanceForm">
         <div class="panel">
           <div class="panel-header"><h3>Monthly Maintenance</h3></div>
           <div class="form-grid">
             <div class="field"><label>Maintenance Dues Amount (₹ per member/month)</label><input id="maintenanceAmount" type="number" step="0.01" min="0" required /></div>
           </div>
-          <p class="text-muted" style="font-size:0.85rem;">Applied automatically each month to generate maintenance dues for every active member — no manual step needed on the Maintenance page.</p>
+          <div class="toolbar mt-16"><button type="submit">Save</button></div>
         </div>
+      </form>
 
+      <form id="reminderForm">
         <div class="panel">
           <div class="panel-header"><h3>Reminder Schedule</h3></div>
           <div class="field"><label>Days of the month to send WhatsApp reminders on</label>
@@ -42,25 +47,28 @@ window.GeneralSettingsPage = {
           <div class="form-grid">
             <div class="field"><label>Time to send (IST)</label><input id="reminderTime" type="time" required /></div>
           </div>
-          <p class="text-muted" style="font-size:0.85rem;">On each checked day, once this time passes (India time), every member with an unpaid due for that month gets a WhatsApp reminder automatically — see the WhatsApp Reminders section below to link the account it sends from.</p>
+          <div class="toolbar mt-16"><button type="submit">Save</button></div>
         </div>
+      </form>
 
+      <form id="balancesForm">
         <div class="panel">
           <div class="panel-header"><h3>Opening Balances</h3></div>
           <div class="form-grid">
             <div class="field"><label>Opening Bank Balance (₹, before digital tracking started)</label><input id="openingBankBalance" type="number" step="0.01" min="0" /></div>
             <div class="field"><label>Opening Petty Cash Balance (₹, before digital tracking started)</label><input id="openingPettyCashBalance" type="number" step="0.01" min="0" /></div>
           </div>
-          <p class="text-muted" style="font-size:0.85rem;">Money already sitting in the bank account or petty cash box before this system started recording transactions. Added into the Dashboard's Net Balance and the Petty Cash page's Cash in Hand figure.</p>
+          <div class="toolbar mt-16"><button type="submit">Save</button></div>
         </div>
+      </form>
 
+      <form id="emailForm">
         <div class="panel">
           <div class="panel-header"><h3>Email Settings (Resend) <span id="emailBadge"></span></h3></div>
           <div class="form-grid">
             <div class="field"><label>Resend API Key</label><input id="resendApiKey" type="password" placeholder="leave blank to keep current" /></div>
             <div class="field"><label>From Email</label><input id="resendFromEmail" type="email" placeholder="onboarding@resend.dev" /></div>
           </div>
-          <p class="text-muted" style="font-size:0.85rem;">Used to send the payment-received notification above, via <a href="https://resend.com" target="_blank">Resend</a>'s free tier. Get an API key from resend.com/api-keys. Leave From Email blank to use Resend's shared sandbox sender (<code>onboarding@resend.dev</code>) &mdash; no domain setup needed to get started; verify your own domain in Resend later if you want to send from your association's own address.</p>
           <div class="toolbar mt-16">
             <button type="submit">Save</button>
             <button type="button" class="secondary" id="testEmailBtn">Send Test Email</button>
@@ -70,11 +78,6 @@ window.GeneralSettingsPage = {
 
       <div class="panel">
         <div class="panel-header"><h3>WhatsApp Reminders <span id="waBadge"></span></h3></div>
-        <p class="text-muted" style="font-size:0.85rem;">
-          Automatically sends a WhatsApp reminder to every member with an unpaid due, on the days/time set under Reminder Schedule above.
-          This links your own WhatsApp account (like WhatsApp Web) rather than using WhatsApp's official Business API &mdash;
-          simpler to set up, but it's against WhatsApp's terms for automated messaging and carries a real risk of the linked number being flagged or banned.
-        </p>
         <div id="waContent"></div>
       </div>
     `;
@@ -98,33 +101,59 @@ window.GeneralSettingsPage = {
       cb.checked = selectedDays.has(cb.value);
     });
 
-    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+    const saveSection = async (payload) => {
+      try {
+        await Api.put('/general-settings', payload);
+        this.showAlert('Saved.', 'success');
+        this.render(container);
+      } catch (err) {
+        this.showAlert(err.message);
+      }
+    };
+
+    document.getElementById('profileForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveSection({
+        app_name: document.getElementById('appName').value.trim(),
+        contact_email: document.getElementById('contactEmail').value.trim(),
+        phone_number: document.getElementById('phoneNumber').value.trim(),
+        office_hours: document.getElementById('officeHours').value.trim(),
+        office_address: document.getElementById('officeAddress').value.trim(),
+      });
+    });
+
+    document.getElementById('maintenanceForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveSection({ maintenance_amount: Number(document.getElementById('maintenanceAmount').value) });
+    });
+
+    document.getElementById('reminderForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const reminderDays = Array.from(document.querySelectorAll('.reminderDay:checked')).map((cb) => cb.value);
       if (!reminderDays.length) {
         this.showAlert('Pick at least one reminder day');
         return;
       }
-      try {
-        await Api.put('/general-settings', {
-          maintenance_amount: Number(document.getElementById('maintenanceAmount').value),
-          opening_bank_balance: Number(document.getElementById('openingBankBalance').value) || 0,
-          opening_petty_cash_balance: Number(document.getElementById('openingPettyCashBalance').value) || 0,
-          app_name: document.getElementById('appName').value.trim(),
-          contact_email: document.getElementById('contactEmail').value.trim(),
-          phone_number: document.getElementById('phoneNumber').value.trim(),
-          office_hours: document.getElementById('officeHours').value.trim(),
-          office_address: document.getElementById('officeAddress').value.trim(),
-          resend_api_key: document.getElementById('resendApiKey').value,
-          resend_from_email: document.getElementById('resendFromEmail').value.trim(),
-          reminder_days: reminderDays.join(','),
-          reminder_time: document.getElementById('reminderTime').value,
-        });
-        this.showAlert('Saved.', 'success');
-        this.render(container);
-      } catch (err) {
-        this.showAlert(err.message);
-      }
+      saveSection({
+        reminder_days: reminderDays.join(','),
+        reminder_time: document.getElementById('reminderTime').value,
+      });
+    });
+
+    document.getElementById('balancesForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveSection({
+        opening_bank_balance: Number(document.getElementById('openingBankBalance').value) || 0,
+        opening_petty_cash_balance: Number(document.getElementById('openingPettyCashBalance').value) || 0,
+      });
+    });
+
+    document.getElementById('emailForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveSection({
+        resend_api_key: document.getElementById('resendApiKey').value,
+        resend_from_email: document.getElementById('resendFromEmail').value.trim(),
+      });
     });
 
     document.getElementById('testEmailBtn').addEventListener('click', async () => {
@@ -165,7 +194,6 @@ window.GeneralSettingsPage = {
     if (result.status === 'connected') {
       badge.innerHTML = '<span class="badge active">connected</span>';
       content.innerHTML = `
-        <p class="text-muted" style="font-size:0.85rem;">Linked and ready. Reminders will send automatically on the scheduled days.</p>
         <div class="toolbar">
           <input type="tel" id="waTestPhone" placeholder="e.g. 9876543210" style="max-width:240px;" />
           <button type="button" class="secondary" id="waTestBtn">Send Test Message</button>

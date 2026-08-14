@@ -18,11 +18,16 @@ router.get('/summary', requireAuth, (req, res) => {
   const totalDonations = db
     .prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM donations WHERE status = 'completed'")
     .get().s;
+  // Lifetime total - feeds the running bank balance below, which must reflect all-time collections,
+  // not just the current month.
   const totalMaintenanceCollected = db
     .prepare('SELECT COALESCE(SUM(amount_paid), 0) AS s FROM maintenance_payments')
     .get().s;
 
   const now = new Date();
+  const maintenanceCollectedThisMonth = db
+    .prepare('SELECT COALESCE(SUM(amount_paid), 0) AS s FROM maintenance_payments WHERE month = ? AND year = ?')
+    .get(now.getMonth() + 1, now.getFullYear()).s;
   const totalMaintenanceDue = db
     .prepare(
       `SELECT COALESCE(SUM(amount_due - amount_paid), 0) AS s FROM maintenance_payments
@@ -43,6 +48,7 @@ router.get('/summary', requireAuth, (req, res) => {
     totalExpenses,
     totalDonations,
     totalMaintenanceCollected,
+    maintenanceCollectedThisMonth,
     totalMaintenanceDue,
     balance,
   });

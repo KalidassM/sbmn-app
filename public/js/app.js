@@ -74,19 +74,19 @@ const Util = {
 
 const NAV_ITEMS = [
   { path: '#/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
+  { path: '#/members', label: 'Members', icon: 'bi-people' },
+  { path: '#/core-members', label: 'Core Members', icon: 'bi-person-badge' },
   { path: '#/maintenance', label: 'Maintenance', icon: 'bi-house-gear' },
   { path: '#/reminders', label: 'Reminders', icon: 'bi-bell', adminOnly: true },
   { path: '#/expenses', label: 'Expenses & Petty Cash', icon: 'bi-cash-coin' },
-  { path: '#/members', label: 'Members', icon: 'bi-people' },
   { path: '#/events', label: 'Events', icon: 'bi-calendar-event' },
   { path: '#/notices', label: 'Notices', icon: 'bi-megaphone' },
-  { path: '#/core-members', label: 'Core Members', icon: 'bi-person-badge' },
   { path: '#/donations', label: 'Donations', icon: 'bi-heart' },
   { path: '#/contact-messages', label: 'Contact Messages', icon: 'bi-envelope', adminOnly: true },
   { path: '#/users', label: 'Login Accounts', icon: 'bi-shield-lock', adminOnly: true },
-  { path: '#/activity-log', label: 'Activity Log', icon: 'bi-clock-history', adminOnly: true },
   { path: '#/payment-settings', label: 'Payment Settings', icon: 'bi-credit-card', superAdminOnly: true },
   { path: '#/general-settings', label: 'General Settings', icon: 'bi-gear', superAdminOnly: true },
+  { path: '#/activity-log', label: 'Activity Log', icon: 'bi-clock-history', adminOnly: true },
 ];
 
 const PAGES = {
