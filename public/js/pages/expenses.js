@@ -11,6 +11,8 @@ window.ExpensesPage = {
       <p class="page-sub">Track association expenses and the day-to-day petty cash box</p>
       <div id="alertBox"></div>
 
+      <div class="stat-grid" id="expenseSummary"></div>
+
       <div class="panel">
         <div class="panel-header"><h3>Expenses</h3></div>
         ${isAdmin ? '<div id="expenseForm"></div>' : ''}
@@ -90,11 +92,24 @@ window.ExpensesPage = {
     }
   },
 
+  renderSummary() {
+    const box = document.getElementById('expenseSummary');
+    if (!box) return;
+    const bankTotal = this.currentExpenses.filter((ex) => ex.source !== 'petty_cash').reduce((sum, ex) => sum + Number(ex.amount), 0);
+    const pettyCashTotal = this.currentExpenses.filter((ex) => ex.source === 'petty_cash').reduce((sum, ex) => sum + Number(ex.amount), 0);
+    box.innerHTML = `
+      <div class="stat-card"><div class="label">Bank Expenses</div><div class="value">${Util.money(bankTotal)}</div></div>
+      <div class="stat-card"><div class="label">Petty Cash Expenses</div><div class="value">${Util.money(pettyCashTotal)}</div></div>
+      <div class="stat-card"><div class="label">Total Expenses (Bank + Petty Cash)</div><div class="value">${Util.money(bankTotal + pettyCashTotal)}</div></div>
+    `;
+  },
+
   async loadExpenses() {
     const user = Api.getUser();
     const isAdmin = Util.isAdmin(user);
     const expenses = await Api.get('/expenses');
     this.currentExpenses = expenses;
+    this.renderSummary();
     const rows = document.getElementById('expenseRows');
     if (!expenses.length) {
       rows.innerHTML = `<tr class="empty-row"><td colspan="7">No expenses recorded</td></tr>`;
