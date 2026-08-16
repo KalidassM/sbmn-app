@@ -161,7 +161,7 @@ window.MaintenancePage = {
         <td>${Util.escapeHtml(p.member_name)}</td>
         <td>${Util.money(p.amount_due)}</td>
         <td>${Util.money(p.amount_paid)}</td>
-        <td>${p.paid_date || '-'}</td>
+        <td>${Util.formatDate(p.paid_date)}</td>
         <td>${Util.escapeHtml(p.payment_mode || '-')}</td>
         <td>${Util.escapeHtml(p.reference_no || '-')}</td>
         <td><span class="badge ${p.status}">${p.status}</span></td>

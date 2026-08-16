@@ -100,7 +100,7 @@ window.RemindersPage = {
         if (m.last_reminder_error) {
           reminderCell = `<span class="badge unpaid" title="${Util.escapeHtml(m.last_reminder_error)}">Failed</span>`;
         } else if (m.last_reminder_sent_at) {
-          reminderCell = `<span class="badge active">Sent ${Util.escapeHtml(m.last_reminder_sent_at)}</span>`;
+          reminderCell = `<span class="badge active">Sent ${Util.formatDate(m.last_reminder_sent_at)}</span>`;
         } else {
           reminderCell = `<span class="badge unpaid">Not sent yet</span>`;
         }

@@ -38,7 +38,7 @@ window.EventsPage = {
         (ev) => `
       <tr>
         <td>${Util.escapeHtml(ev.title)}</td>
-        <td>${ev.event_date}</td>
+        <td>${Util.formatDate(ev.event_date)}</td>
         <td>${Util.escapeHtml(ev.venue || '-')}</td>
         <td>${Util.escapeHtml(ev.description || '-')}</td>
         ${

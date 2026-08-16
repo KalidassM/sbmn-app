@@ -46,8 +46,8 @@ window.CoreMembersPage = {
         }</td>
         <td>${Util.escapeHtml(r.member_name)}</td>
         <td>${Util.escapeHtml(r.designation)}</td>
-        <td>${r.start_date || '-'}</td>
-        <td>${r.end_date ? r.end_date : '<span class="badge active">current</span>'}</td>
+        <td>${Util.formatDate(r.start_date)}</td>
+        <td>${r.end_date ? Util.formatDate(r.end_date) : '<span class="badge active">current</span>'}</td>
         <td>${Util.escapeHtml(r.notes || '-')}</td>
         ${
           isAdmin
@@ -86,7 +86,11 @@ window.CoreMembersPage = {
   renderForm(panel, row) {
     if (!panel) return;
     const isEdit = !!row;
+    // Only offer active members for a new assignment - but if editing an existing assignment
+    // whose member has since gone inactive, still include them so the (disabled) select can
+    // correctly show who's assigned rather than rendering blank.
     const memberOptions = this.members
+      .filter((m) => m.status === 'active' || (isEdit && m.id === row?.member_id))
       .map((m) => `<option value="${m.id}" ${row?.member_id === m.id ? 'selected' : ''}>${Util.escapeHtml(m.name)}</option>`)
       .join('');
     panel.innerHTML = `

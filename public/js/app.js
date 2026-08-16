@@ -19,6 +19,15 @@ const Util = {
     const d = new Date();
     return d.toISOString().slice(0, 10);
   },
+  // Reformats a YYYY-MM-DD (or YYYY-MM-DD HH:MM:SS) string from the DB into DD/MM/YYYY for
+  // display in list views - any trailing time portion is kept as-is, just the date part reorders.
+  formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})(.*)$/);
+    if (!match) return dateStr;
+    const [, y, m, d, rest] = match;
+    return `${d}/${m}/${y}${rest}`;
+  },
   isAdmin(user) {
     return !!user && (user.role === 'admin' || user.role === 'super_admin');
   },

@@ -27,8 +27,8 @@ window.MembersPage = {
           }
         </div>
         <table>
-          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th><th>Phone</th><th>Email</th><th>Joined</th><th>Status</th><th>Inactive Since</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="9">Loading…</td></tr></tbody>
+          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th>${isAdmin ? '<th>Phone</th>' : ''}<th>Email</th><th>Joined</th><th>Status</th><th>Inactive Since</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="${isAdmin ? 9 : 6}">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -171,7 +171,7 @@ window.MembersPage = {
     const members = await Api.get('/members');
     const rows = document.getElementById('rows');
     if (!members.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="9">No members yet</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="${isAdmin ? 9 : 6}">No members yet</td></tr>`;
       return;
     }
     rows.innerHTML = members
@@ -181,11 +181,11 @@ window.MembersPage = {
         ${isAdmin ? `<td><input type="checkbox" class="memberSelect" value="${m.id}" ${this.selectedIds.has(m.id) ? 'checked' : ''} /></td>` : ''}
         <td>${Util.escapeHtml(m.site_no || '-')}</td>
         <td>${Util.escapeHtml(m.name)}</td>
-        <td>${Util.escapeHtml(m.phone || '-')}</td>
+        ${isAdmin ? `<td>${Util.escapeHtml(m.phone || '-')}</td>` : ''}
         <td>${Util.escapeHtml(m.email || '-')}</td>
-        <td>${m.join_date || '-'}</td>
+        <td>${Util.formatDate(m.join_date)}</td>
         <td><span class="badge ${m.status}">${m.status}</span></td>
-        <td>${m.inactive_date || '-'}</td>
+        <td>${Util.formatDate(m.inactive_date)}</td>
         ${
           isAdmin
             ? `<td class="toolbar">

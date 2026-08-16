@@ -43,7 +43,7 @@ window.DonationsPage = {
       .map(
         (d) => `
       <tr>
-        <td>${d.donation_date}</td>
+        <td>${Util.formatDate(d.donation_date)}</td>
         <td>${Util.escapeHtml(d.member_name || d.donor_name || '-')}${d.donor_email || d.donor_phone ? `<br><span class="text-muted" style="font-size:0.78rem;">${Util.escapeHtml(d.donor_email || d.donor_phone)}</span>` : ''}</td>
         <td>${Util.money(d.amount)}</td>
         <td>${Util.escapeHtml(d.purpose || '-')}</td>

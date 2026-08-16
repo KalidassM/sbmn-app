@@ -40,7 +40,7 @@ window.NoticesPage = {
         <td>${Util.escapeHtml(n.title)}</td>
         <td>${Util.escapeHtml(n.body)}</td>
         <td>${n.pinned ? '<span class="badge active">Pinned</span>' : '-'}</td>
-        <td>${n.created_at || '-'}</td>
+        <td>${Util.formatDate(n.created_at)}</td>
         ${
           isAdmin
             ? `<td class="toolbar">

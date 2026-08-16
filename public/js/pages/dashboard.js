@@ -54,7 +54,7 @@ window.DashboardPage = {
               myDonations.length
                 ? myDonations
                     .map(
-                      (d) => `<tr><td>${d.donation_date}</td><td>${Util.money(d.amount)}</td><td>${Util.escapeHtml(d.purpose || '-')}</td><td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.status}</span></td></tr>`
+                      (d) => `<tr><td>${Util.formatDate(d.donation_date)}</td><td>${Util.money(d.amount)}</td><td>${Util.escapeHtml(d.purpose || '-')}</td><td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.status}</span></td></tr>`
                     )
                     .join('')
                 : '<tr class="empty-row"><td colspan="4">You haven\'t made a donation yet</td></tr>'
@@ -74,7 +74,7 @@ window.DashboardPage = {
               upcoming.length
                 ? upcoming
                     .map(
-                      (e) => `<tr><td>${Util.escapeHtml(e.title)}</td><td>${e.event_date}</td><td>${Util.escapeHtml(e.venue || '-')}</td></tr>`
+                      (e) => `<tr><td>${Util.escapeHtml(e.title)}</td><td>${Util.formatDate(e.event_date)}</td><td>${Util.escapeHtml(e.venue || '-')}</td></tr>`
                     )
                     .join('')
                 : '<tr class="empty-row"><td colspan="3">No upcoming events</td></tr>'
@@ -92,7 +92,7 @@ window.DashboardPage = {
               recentNotices.length
                 ? recentNotices
                     .map(
-                      (n) => `<tr><td>${Util.escapeHtml(n.title)}${n.pinned ? ' <span class="badge active">Pinned</span>' : ''}</td><td>${Util.escapeHtml(n.body)}</td><td>${n.created_at || '-'}</td></tr>`
+                      (n) => `<tr><td>${Util.escapeHtml(n.title)}${n.pinned ? ' <span class="badge active">Pinned</span>' : ''}</td><td>${Util.escapeHtml(n.body)}</td><td>${Util.formatDate(n.created_at)}</td></tr>`
                     )
                     .join('')
                 : '<tr class="empty-row"><td colspan="3">No notices yet</td></tr>'

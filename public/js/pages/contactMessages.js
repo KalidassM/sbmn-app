@@ -30,7 +30,7 @@ window.ContactMessagesPage = {
       .map(
         (m) => `
       <tr>
-        <td>${m.created_at}</td>
+        <td>${Util.formatDate(m.created_at)}</td>
         <td>${Util.escapeHtml(m.name)}</td>
         <td>${Util.escapeHtml(m.house_no || '-')}</td>
         <td>${Util.escapeHtml(m.phone)}</td>

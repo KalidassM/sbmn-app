@@ -119,7 +119,7 @@ window.ExpensesPage = {
       .map(
         (ex) => `
       <tr>
-        <td>${ex.expense_date}</td>
+        <td>${Util.formatDate(ex.expense_date)}</td>
         <td>${Util.escapeHtml(ex.title)}</td>
         <td>${Util.escapeHtml(ex.category || '-')}</td>
         <td>${Util.money(ex.amount)}</td>
@@ -240,7 +240,7 @@ window.ExpensesPage = {
       .map(
         (t) => `
       <tr>
-        <td>${t.txn_date}</td>
+        <td>${Util.formatDate(t.txn_date)}</td>
         <td><span class="badge ${t.type === 'topup' ? 'active' : 'unpaid'}">${t.type === 'topup' ? 'Top-up' : 'Expense'}</span></td>
         <td>${Util.escapeHtml(t.description)}</td>
         <td>${Util.escapeHtml(t.category || '-')}</td>

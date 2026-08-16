@@ -6,15 +6,23 @@ const { notifyMember, welcomeMessage } = require('../utils/memberNotify');
 
 const router = express.Router();
 
+// Phone numbers are only for admin/super_admin eyes - a plain member can see the directory but
+// not everyone's contact number.
+function redactPhone(member, req) {
+  if (['admin', 'super_admin'].includes(req.user.role)) return member;
+  const { phone, ...rest } = member;
+  return rest;
+}
+
 router.get('/', requireAuth, (req, res) => {
   const members = db.prepare('SELECT * FROM members ORDER BY CAST(site_no AS INTEGER), site_no').all();
-  res.json(members);
+  res.json(members.map((m) => redactPhone(m, req)));
 });
 
 router.get('/:id', requireAuth, (req, res) => {
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
   if (!member) return res.status(404).json({ error: 'Member not found' });
-  res.json(member);
+  res.json(redactPhone(member, req));
 });
 
 router.post('/', requireAuth, requireAdmin, async (req, res) => {
