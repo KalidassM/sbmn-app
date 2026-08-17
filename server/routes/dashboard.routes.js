@@ -37,9 +37,7 @@ router.get('/summary', requireAuth, (req, res) => {
     )
     .get(now.getMonth() + 1, now.getFullYear()).s;
 
-  const generalSettings = db.prepare('SELECT opening_bank_balance, opening_petty_cash_balance FROM general_settings WHERE id = 1').get();
-  const openingBalance = (generalSettings?.opening_bank_balance || 0) + (generalSettings?.opening_petty_cash_balance || 0);
-  const balance = openingBalance + totalMaintenanceCollected + totalDonations - totalExpenses;
+  const balance = totalMaintenanceCollected + totalDonations - totalExpenses;
 
   res.json({
     memberCount,

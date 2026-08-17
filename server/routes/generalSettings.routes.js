@@ -20,8 +20,6 @@ router.get('/', requireAuth, (req, res) => {
 router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
   const {
     maintenance_amount,
-    opening_bank_balance,
-    opening_petty_cash_balance,
     app_name,
     contact_email,
     office_address,
@@ -62,15 +60,13 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
 
   db.prepare(
     `UPDATE general_settings SET
-       maintenance_amount = ?, opening_bank_balance = ?, opening_petty_cash_balance = ?,
+       maintenance_amount = ?,
        app_name = ?, contact_email = ?, office_address = ?, office_hours = ?, phone_number = ?,
        resend_api_key = ?, resend_from_email = ?, reminder_days = ?, reminder_time = ?,
        updated_at = datetime('now')
      WHERE id = 1`
   ).run(
     finalMaintenanceAmount,
-    opening_bank_balance !== undefined ? Number(opening_bank_balance) : existing.opening_bank_balance,
-    opening_petty_cash_balance !== undefined ? Number(opening_petty_cash_balance) : existing.opening_petty_cash_balance,
     app_name !== undefined ? app_name || null : existing.app_name,
     contact_email !== undefined ? contact_email || null : existing.contact_email,
     office_address !== undefined ? office_address || null : existing.office_address,

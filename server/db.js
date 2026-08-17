@@ -152,14 +152,14 @@ CREATE TABLE IF NOT EXISTS activity_log (
 db.prepare('INSERT OR IGNORE INTO payment_settings (id) VALUES (1)').run();
 db.prepare('INSERT OR IGNORE INTO general_settings (id) VALUES (1)').run();
 
-// Migration: opening balances that predate digital tracking (bank account + petty cash box)
+// Migration: drop the pre-digital-tracking opening balances (bank account + petty cash box) -
+// retired feature, balances are now purely computed from actual transaction history
 const generalSettingsColumns = db.prepare('PRAGMA table_info(general_settings)').all().map((c) => c.name);
-if (!generalSettingsColumns.includes('opening_bank_balance')) {
-  db.exec('ALTER TABLE general_settings ADD COLUMN opening_bank_balance REAL NOT NULL DEFAULT 0');
-}
-if (!generalSettingsColumns.includes('opening_petty_cash_balance')) {
-  db.exec('ALTER TABLE general_settings ADD COLUMN opening_petty_cash_balance REAL NOT NULL DEFAULT 0');
-}
+['opening_bank_balance', 'opening_petty_cash_balance'].forEach((col) => {
+  if (generalSettingsColumns.includes(col)) {
+    db.exec(`ALTER TABLE general_settings DROP COLUMN ${col}`);
+  }
+});
 
 // Migration: association profile fields (for payment notification emails + public site display)
 ['app_name', 'contact_email', 'office_address', 'office_hours', 'phone_number'].forEach((col) => {
