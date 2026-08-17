@@ -165,7 +165,10 @@ window.UsersPage = {
     const isSuperAdmin = Api.getUser().role === 'super_admin';
     const memberOptions =
       '<option value="">-- No linked member --</option>' +
-      this.members.map((m) => `<option value="${m.id}">${Util.escapeHtml(m.name)}</option>`).join('');
+      this.members
+        .filter((m) => m.status === 'active')
+        .map((m) => `<option value="${m.id}">${Util.escapeHtml(m.name)}</option>`)
+        .join('');
     panel.innerHTML = `
       <div class="panel-header"><h3>Create Login Account</h3></div>
       <form id="userForm">
