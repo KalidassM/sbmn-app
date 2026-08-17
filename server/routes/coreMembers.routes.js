@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { ensureCoreMemberAccount } = require('../utils/coreMemberAccount');
 
 const router = express.Router();
 
@@ -37,7 +38,21 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     entityId: row.id,
     description: `Added core member ${row.member_name} as ${row.designation}`,
   });
-  res.status(201).json(row);
+
+  const account = ensureCoreMemberAccount(member_id);
+  if (account.action === 'created' || account.action === 'upgraded') {
+    logActivity({
+      actor: req.user?.username,
+      action: 'update',
+      entityType: 'user',
+      description:
+        account.action === 'created'
+          ? `Created admin login account ${account.username} for core member ${row.member_name}`
+          : `Upgraded login account ${account.username} to admin for core member ${row.member_name}`,
+    });
+  }
+
+  res.status(201).json({ ...row, account });
 });
 
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {

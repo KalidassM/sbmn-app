@@ -1,8 +1,12 @@
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { requireAuth, JWT_SECRET } = require('../middleware/auth');
+const whatsapp = require('../utils/whatsappClient');
+
+const RESET_CODE_TTL_MINUTES = 15;
 
 const router = express.Router();
 
@@ -16,13 +20,13 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role, member_id: user.member_id },
+    { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: !!user.must_change_password },
     JWT_SECRET,
     { expiresIn: '12h' }
   );
   res.json({
     token,
-    user: { id: user.id, username: user.username, role: user.role, member_id: user.member_id },
+    user: { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: !!user.must_change_password },
   });
 });
 
@@ -40,8 +44,95 @@ router.post('/change-password', requireAuth, (req, res) => {
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
   const hash = bcrypt.hashSync(newPassword, 10);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, user.id);
-  res.json({ ok: true });
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hash, user.id);
+
+  // Issue a fresh token/user so the client can clear the forced-change-password state without
+  // having to log in again - the old token's must_change_password claim would otherwise stick
+  // around until it naturally expires.
+  const token = jwt.sign(
+    { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: false },
+    JWT_SECRET,
+    { expiresIn: '12h' }
+  );
+  res.json({
+    ok: true,
+    token,
+    user: { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: false },
+  });
+});
+
+// A user's WhatsApp number for the reset code: their linked member's phone, or - for accounts
+// created without a member link (e.g. the default admin) - the username itself if it looks like
+// a phone number, matching the "username = phone number" convention used for bulk-created accounts.
+function resolveResetPhone(user) {
+  if (user.member_id) {
+    const member = db.prepare('SELECT phone FROM members WHERE id = ?').get(user.member_id);
+    if (member?.phone) return member.phone;
+  }
+  return /^\d{10}$/.test(user.username) ? user.username : null;
+}
+
+router.post('/forgot-password', (req, res) => {
+  const { username } = req.body || {};
+  if (!username) return res.status(400).json({ error: 'Username is required' });
+
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (!user) return res.status(404).json({ error: 'No account found with that username' });
+
+  const phone = resolveResetPhone(user);
+  if (!phone) return res.status(400).json({ error: 'No phone number on file for this account. Contact an administrator.' });
+
+  if (!whatsapp.isConnected()) {
+    return res.status(503).json({ error: 'WhatsApp is not connected right now. Please contact an administrator.' });
+  }
+
+  const code = String(crypto.randomInt(100000, 1000000));
+  const codeHash = bcrypt.hashSync(code, 10);
+  const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60 * 1000).toISOString();
+  db.prepare('UPDATE users SET reset_code_hash = ?, reset_code_expires_at = ? WHERE id = ?').run(codeHash, expiresAt, user.id);
+
+  const settings = db.prepare('SELECT app_name FROM general_settings WHERE id = 1').get();
+  const appName = settings?.app_name || 'the Association';
+  const text = `Your password reset code for ${appName} portal is: ${code}. It expires in ${RESET_CODE_TTL_MINUTES} minutes. If you did not request this, please ignore this message.`;
+
+  whatsapp
+    .sendMessage(phone, text)
+    .then(() => res.json({ ok: true }))
+    .catch((err) => {
+      console.error('Forgot-password WhatsApp send failed:', err.message);
+      res.status(500).json({ error: 'Could not send the reset code over WhatsApp. Please try again or contact an administrator.' });
+    });
+});
+
+router.post('/reset-password', (req, res) => {
+  const { username, code, newPassword } = req.body || {};
+  if (!username || !code || !newPassword) {
+    return res.status(400).json({ error: 'Username, code and new password are required' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (!user || !user.reset_code_hash) return res.status(400).json({ error: 'Invalid or expired code' });
+  if (!user.reset_code_expires_at || new Date(user.reset_code_expires_at).getTime() < Date.now()) {
+    return res.status(400).json({ error: 'This code has expired. Please request a new one.' });
+  }
+  if (!bcrypt.compareSync(String(code), user.reset_code_hash)) {
+    return res.status(400).json({ error: 'Invalid or expired code' });
+  }
+
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare(
+    'UPDATE users SET password_hash = ?, must_change_password = 0, reset_code_hash = NULL, reset_code_expires_at = NULL WHERE id = ?'
+  ).run(hash, user.id);
+
+  const token = jwt.sign(
+    { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: false },
+    JWT_SECRET,
+    { expiresIn: '12h' }
+  );
+  res.json({
+    ok: true,
+    token,
+    user: { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: false },
+  });
 });
 
 module.exports = router;

@@ -14,7 +14,17 @@ window.ExpensesPage = {
       <div class="stat-grid" id="expenseSummary"></div>
 
       <div class="panel">
-        <div class="panel-header"><h3>Expenses</h3></div>
+        <div class="panel-header">
+          <h3>Expenses</h3>
+          ${
+            isAdmin
+              ? `<div class="toolbar">
+                  <button type="button" class="secondary" id="exportExpensesBtn">Export CSV</button>
+                  <button type="button" class="secondary" id="exportExpensesPdfBtn">Export PDF</button>
+                </div>`
+              : ''
+          }
+        </div>
         ${isAdmin ? '<div id="expenseForm"></div>' : ''}
         <table>
           <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Source</th><th>Notes</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
@@ -23,7 +33,17 @@ window.ExpensesPage = {
       </div>
 
       <div class="panel">
-        <div class="panel-header"><h3>Petty Cash</h3></div>
+        <div class="panel-header">
+          <h3>Petty Cash</h3>
+          ${
+            isAdmin
+              ? `<div class="toolbar">
+                  <button type="button" class="secondary" id="exportPettyCashBtn">Export CSV</button>
+                  <button type="button" class="secondary" id="exportPettyCashPdfBtn">Export PDF</button>
+                </div>`
+              : ''
+          }
+        </div>
         <div class="stat-grid" id="pettyCashStats"></div>
         ${isAdmin ? '<div id="pettyCashForm"></div>' : ''}
         <table>
@@ -34,11 +54,59 @@ window.ExpensesPage = {
     `;
 
     if (isAdmin) {
+      document.getElementById('exportExpensesBtn').addEventListener('click', () => this.exportExpensesCsv());
+      document.getElementById('exportPettyCashBtn').addEventListener('click', () => this.exportPettyCashCsv());
+      document.getElementById('exportExpensesPdfBtn').addEventListener('click', () => this.exportExpensesPdf());
+      document.getElementById('exportPettyCashPdfBtn').addEventListener('click', () => this.exportPettyCashPdf());
+    }
+
+    if (isAdmin) {
       this.renderExpenseForm();
       this.renderPettyCashForm();
     }
 
     await Promise.all([this.loadExpenses(), this.loadPettyCash()]);
+  },
+
+  exportExpensesCsv() {
+    const rows = [
+      ['Date', 'Title', 'Category', 'Amount', 'Source', 'Notes'],
+      ...this.currentExpenses.map((ex) => [ex.expense_date, ex.title, ex.category || '', ex.amount, ex.source === 'petty_cash' ? 'Petty Cash' : 'Bank', ex.notes || '']),
+    ];
+    Util.downloadCsv(`expenses-${Util.todayISO()}.csv`, rows);
+  },
+
+  exportPettyCashCsv() {
+    const rows = [
+      ['Date', 'Type', 'Description', 'Category', 'Amount'],
+      ...this.currentTransactions.map((t) => [t.txn_date, t.type === 'topup' ? 'Top-up' : 'Expense', t.description, t.category || '', t.amount]),
+    ];
+    Util.downloadCsv(`petty-cash-${Util.todayISO()}.csv`, rows);
+  },
+
+  exportExpensesPdf() {
+    const columns = ['Date', 'Title', 'Category', 'Amount', 'Source', 'Notes'];
+    const rows = this.currentExpenses.map((ex) => [
+      Util.formatDate(ex.expense_date),
+      ex.title,
+      ex.category || '-',
+      Util.moneyPlain(ex.amount),
+      ex.source === 'petty_cash' ? 'Petty Cash' : 'Bank',
+      ex.notes || '-',
+    ]);
+    Util.downloadPdf(`expenses-${Util.todayISO()}.pdf`, 'Expenses Report', columns, rows);
+  },
+
+  exportPettyCashPdf() {
+    const columns = ['Date', 'Type', 'Description', 'Category', 'Amount'];
+    const rows = this.currentTransactions.map((t) => [
+      Util.formatDate(t.txn_date),
+      t.type === 'topup' ? 'Top-up' : 'Expense',
+      t.description,
+      t.category || '-',
+      Util.moneyPlain(t.amount),
+    ]);
+    Util.downloadPdf(`petty-cash-${Util.todayISO()}.pdf`, 'Petty Cash Report', columns, rows);
   },
 
   showAlert(message, type = 'error') {

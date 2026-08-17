@@ -11,6 +11,13 @@ const Util = {
     const num = Number(n) || 0;
     return '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   },
+  // Same as money(), but for jsPDF exports - jsPDF's built-in fonts (Helvetica/Times/Courier)
+  // only cover the Latin-1 range, so the ₹ glyph (U+20B9) renders as a mangled fallback
+  // character. No currency symbol/prefix at all, just the plain formatted number.
+  moneyPlain(n) {
+    const num = Number(n) || 0;
+    return num.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  },
   monthName(m) {
     const names = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return names[Number(m)] || m;
@@ -30,6 +37,40 @@ const Util = {
   },
   isAdmin(user) {
     return !!user && (user.role === 'admin' || user.role === 'super_admin');
+  },
+  // Downloads `rows` (array of arrays, first row = header) as a CSV file. Handles quoting/escaping
+  // for values containing commas, quotes, or newlines - unlike a hand-built CSV string.
+  downloadCsv(filename, rows) {
+    const escapeCell = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const csv = rows.map((row) => row.map(escapeCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+  // Builds a simple titled table PDF via jsPDF + autoTable (loaded from CDN in portal.html) and
+  // triggers a download. `columns` is an array of header labels, `rows` an array of arrays.
+  downloadPdf(filename, title, columns, rows) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(title, 14, 15);
+    doc.autoTable({
+      head: [columns],
+      body: rows,
+      startY: 20,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [47, 111, 78] },
+    });
+    doc.save(filename);
   },
   initials(name) {
     return (name || '')
@@ -83,6 +124,7 @@ const Util = {
 
 const NAV_ITEMS = [
   { path: '#/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
+  { path: '#/profile', label: 'My Profile', icon: 'bi-person-circle' },
   { path: '#/members', label: 'Members', icon: 'bi-people' },
   { path: '#/core-members', label: 'Core Members', icon: 'bi-person-badge' },
   { path: '#/maintenance', label: 'Maintenance', icon: 'bi-house-gear' },
@@ -100,6 +142,7 @@ const NAV_ITEMS = [
 
 const PAGES = {
   '#/dashboard': window.DashboardPage,
+  '#/profile': window.ProfilePage,
   '#/members': window.MembersPage,
   '#/core-members': window.CoreMembersPage,
   '#/events': window.EventsPage,
@@ -113,6 +156,7 @@ const PAGES = {
   '#/activity-log': window.ActivityLogPage,
   '#/payment-settings': window.PaymentSettingsPage,
   '#/general-settings': window.GeneralSettingsPage,
+  '#/change-password-required': window.ChangePasswordRequiredPage,
 };
 
 function renderShell() {
@@ -221,17 +265,32 @@ async function router() {
   const token = Api.getToken();
 
   if (!token || !user) {
-    if (hash !== '#/login') {
+    if (hash !== '#/login' && hash !== '#/forgot-password') {
       window.location.hash = '#/login';
       return;
     }
     const app = document.getElementById('app');
     app.innerHTML = '';
-    window.LoginPage.render(app);
+    if (hash === '#/forgot-password') {
+      window.ForgotPasswordPage.render(app);
+    } else {
+      window.LoginPage.render(app);
+    }
     return;
   }
 
-  if (hash === '#/login') {
+  if (hash === '#/login' || hash === '#/forgot-password') {
+    window.location.hash = '#/dashboard';
+    return;
+  }
+
+  // Bulk-created (and any explicitly flagged) accounts must set a real password before doing
+  // anything else - every navigation attempt bounces back here until that's done.
+  if (user.must_change_password && hash !== '#/change-password-required') {
+    window.location.hash = '#/change-password-required';
+    return;
+  }
+  if (!user.must_change_password && hash === '#/change-password-required') {
     window.location.hash = '#/dashboard';
     return;
   }

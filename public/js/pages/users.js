@@ -1,9 +1,35 @@
 window.UsersPage = {
   async render(container) {
+    const isSuperAdmin = Api.getUser().role === 'super_admin';
     container.innerHTML = `
       <h1>Login Accounts</h1>
       <p class="page-sub">Manage who can sign in to this portal and their access level</p>
       <div id="alertBox"></div>
+      ${
+        isSuperAdmin
+          ? `<div class="panel" id="bulkUserPanel">
+        <div class="panel-header"><h3>Bulk Create Member Accounts</h3></div>
+        <p class="text-muted" style="font-size:0.85rem;">
+          Creates a login (role: Member, view-only) for every currently active member who doesn't already have one.
+          Username = their phone number, initial password = phone number + "@123". They'll be required to set a
+          new password the first time they log in. Safe to re-run - members who already have an account are skipped.
+        </p>
+        <div class="toolbar mt-16"><button type="button" id="bulkCreateUsersBtn">Create Accounts for Active Members</button></div>
+        <div id="bulkCreateResult" class="mt-16"></div>
+      </div>
+      <div class="panel" id="bulkCoreUserPanel">
+        <div class="panel-header"><h3>Create Admin Accounts for Core Members</h3></div>
+        <p class="text-muted" style="font-size:0.85rem;">
+          Creates an 'admin'-role login for every currently active Core Member who doesn't already have one
+          (username = phone number, initial password = phone number + "@core"), or upgrades their existing
+          login to admin if they already have one. They'll be required to set a new password the first time
+          a newly-created account logs in. Safe to re-run.
+        </p>
+        <div class="toolbar mt-16"><button type="button" id="bulkCreateCoreUsersBtn">Create Accounts for Core Members</button></div>
+        <div id="bulkCreateCoreResult" class="mt-16"></div>
+      </div>`
+          : ''
+      }
       <div class="panel" id="formPanel"></div>
       <div class="panel">
         <div class="panel-header"><h3>Accounts</h3></div>
@@ -15,7 +41,73 @@ window.UsersPage = {
     `;
     this.members = await Api.get('/members');
     this.renderForm(document.getElementById('formPanel'));
+    if (isSuperAdmin) {
+      document.getElementById('bulkCreateUsersBtn').addEventListener('click', () => this.bulkCreateAccounts());
+      document.getElementById('bulkCreateCoreUsersBtn').addEventListener('click', () => this.bulkCreateCoreAccounts());
+    }
     await this.loadRows();
+  },
+
+  async bulkCreateAccounts() {
+    if (!confirm('Create a login account for every active member who doesn\'t already have one? Usernames/passwords will be based on their phone numbers.')) return;
+    const btn = document.getElementById('bulkCreateUsersBtn');
+    const resultBox = document.getElementById('bulkCreateResult');
+    btn.disabled = true;
+    try {
+      const result = await Api.post('/users/bulk-create-for-members');
+      let html = `<div class="alert success">${result.created} account(s) created${result.skipped.length ? `, ${result.skipped.length} skipped` : ''}.</div>`;
+      if (result.createdAccounts.length) {
+        html += `
+          <table class="mt-16">
+            <thead><tr><th>Member</th><th>Username</th></tr></thead>
+            <tbody>${result.createdAccounts.map((a) => `<tr><td>${Util.escapeHtml(a.name)}</td><td>${Util.escapeHtml(a.username)}</td></tr>`).join('')}</tbody>
+          </table>`;
+      }
+      if (result.skipped.length) {
+        html += `
+          <table class="mt-16">
+            <thead><tr><th>Member</th><th>Skipped Reason</th></tr></thead>
+            <tbody>${result.skipped.map((s) => `<tr><td>${Util.escapeHtml(s.name)}</td><td class="text-muted">${Util.escapeHtml(s.reason)}</td></tr>`).join('')}</tbody>
+          </table>`;
+      }
+      resultBox.innerHTML = html;
+      await this.loadRows();
+    } catch (err) {
+      this.showAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  },
+
+  async bulkCreateCoreAccounts() {
+    if (!confirm('Create or upgrade an admin login account for every active Core Member? Usernames/passwords for new accounts will be based on their phone numbers.')) return;
+    const btn = document.getElementById('bulkCreateCoreUsersBtn');
+    const resultBox = document.getElementById('bulkCreateCoreResult');
+    btn.disabled = true;
+    try {
+      const result = await Api.post('/users/bulk-create-for-core-members');
+      let html = `<div class="alert success">${result.created} created, ${result.upgraded} upgraded to admin${result.skipped.length ? `, ${result.skipped.length} skipped` : ''}.</div>`;
+      if (result.createdAccounts.length) {
+        html += `
+          <table class="mt-16">
+            <thead><tr><th>Core Member</th><th>Username</th></tr></thead>
+            <tbody>${result.createdAccounts.map((a) => `<tr><td>${Util.escapeHtml(a.name)}</td><td>${Util.escapeHtml(a.username)}</td></tr>`).join('')}</tbody>
+          </table>`;
+      }
+      if (result.skipped.length) {
+        html += `
+          <table class="mt-16">
+            <thead><tr><th>Core Member</th><th>Skipped Reason</th></tr></thead>
+            <tbody>${result.skipped.map((s) => `<tr><td>${Util.escapeHtml(s.name)}</td><td class="text-muted">${Util.escapeHtml(s.reason)}</td></tr>`).join('')}</tbody>
+          </table>`;
+      }
+      resultBox.innerHTML = html;
+      await this.loadRows();
+    } catch (err) {
+      this.showAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
   },
 
   showAlert(message, type = 'error') {

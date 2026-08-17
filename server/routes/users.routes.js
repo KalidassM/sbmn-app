@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { requireAuth, requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { firstPhoneDigits } = require('../utils/phone');
+const { ensureCoreMemberAccount } = require('../utils/coreMemberAccount');
 
 const router = express.Router();
 
@@ -40,6 +42,90 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   } catch (err) {
     res.status(400).json({ error: 'Username already exists' });
   }
+});
+
+// Creates a login account (role 'member') for every active member who doesn't already have one,
+// using their phone number as both the username and the initial password (with "@123" appended).
+// Flags the account so the forced-change-password flow kicks in on first login. Safe to re-run -
+// members who already have a linked login are skipped, not duplicated.
+router.post('/bulk-create-for-members', requireAuth, requireSuperAdmin, (req, res) => {
+  const members = db.prepare("SELECT id, name, phone FROM members WHERE status = 'active'").all();
+  const findExistingLogin = db.prepare('SELECT id FROM users WHERE member_id = ?');
+  const insertUser = db.prepare(
+    `INSERT INTO users (username, password_hash, role, member_id, must_change_password) VALUES (?, ?, 'member', ?, 1)`
+  );
+
+  let created = 0;
+  const createdAccounts = [];
+  const skipped = [];
+
+  db.transaction((rows) => {
+    for (const m of rows) {
+      if (findExistingLogin.get(m.id)) {
+        skipped.push({ member_id: m.id, name: m.name, reason: 'Already has a login account' });
+        continue;
+      }
+      const username = firstPhoneDigits(m.phone);
+      if (!username) {
+        skipped.push({ member_id: m.id, name: m.name, reason: 'No usable phone number on file' });
+        continue;
+      }
+      const password = `${username}@123`;
+      const hash = bcrypt.hashSync(password, 10);
+      try {
+        insertUser.run(username, hash, m.id);
+        created++;
+        createdAccounts.push({ member_id: m.id, name: m.name, username });
+      } catch (err) {
+        skipped.push({ member_id: m.id, name: m.name, reason: 'Username already exists (duplicate phone number)' });
+      }
+    }
+  })(members);
+
+  logActivity({
+    actor: req.user?.username,
+    action: 'bulk_upload',
+    entityType: 'user',
+    description: `Bulk-created ${created} member login account(s); ${skipped.length} skipped`,
+  });
+  res.json({ created, createdAccounts, skipped });
+});
+
+// Catches up any Core Member assigned before the auto-account flow existed (or whose account
+// creation was skipped at the time) - creates/upgrades an 'admin'-role login for every currently
+// active core member (end_date not set), via the same ensureCoreMemberAccount used on assignment.
+router.post('/bulk-create-for-core-members', requireAuth, requireSuperAdmin, (req, res) => {
+  const coreMembers = db
+    .prepare(
+      `SELECT cm.member_id, m.name FROM core_members cm JOIN members m ON m.id = cm.member_id WHERE cm.end_date IS NULL`
+    )
+    .all();
+
+  let created = 0;
+  let upgraded = 0;
+  const createdAccounts = [];
+  const skipped = [];
+
+  for (const cm of coreMembers) {
+    const result = ensureCoreMemberAccount(cm.member_id);
+    if (result.action === 'created') {
+      created++;
+      createdAccounts.push({ member_id: cm.member_id, name: cm.name, username: result.username });
+    } else if (result.action === 'upgraded') {
+      upgraded++;
+      createdAccounts.push({ member_id: cm.member_id, name: cm.name, username: result.username });
+    } else {
+      skipped.push({ member_id: cm.member_id, name: cm.name, reason: result.reason });
+    }
+  }
+
+  logActivity({
+    actor: req.user?.username,
+    action: 'bulk_upload',
+    entityType: 'user',
+    description: `Bulk-created ${created} and upgraded ${upgraded} core member admin login account(s); ${skipped.length} skipped`,
+  });
+  res.json({ created, upgraded, createdAccounts, skipped });
 });
 
 router.put('/:id/reset-password', requireAuth, requireSuperAdmin, (req, res) => {

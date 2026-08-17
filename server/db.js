@@ -298,6 +298,22 @@ if (usersTableSql && !usersTableSql.includes('super_admin')) {
   db.prepare("UPDATE users SET role = 'super_admin' WHERE username = 'admin' AND role = 'admin'").run();
 }
 
+// Migration: force a password change on next login (used for bulk-created member accounts,
+// whose initial password is derived from their phone number and shouldn't be kept long-term)
+const usersColumns = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+if (!usersColumns.includes('must_change_password')) {
+  db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+}
+
+// Migration: forgot-password support - a short-lived WhatsApp-delivered reset code, hashed like a
+// password rather than stored in plain text
+if (!usersColumns.includes('reset_code_hash')) {
+  db.exec('ALTER TABLE users ADD COLUMN reset_code_hash TEXT');
+}
+if (!usersColumns.includes('reset_code_expires_at')) {
+  db.exec('ALTER TABLE users ADD COLUMN reset_code_expires_at TEXT');
+}
+
 // Seed a default admin account on first run
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
 if (userCount === 0) {

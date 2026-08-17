@@ -19,16 +19,30 @@ window.MaintenancePage = {
       <div class="panel">
         <div class="panel-header">
           <h3>Maintenance Dues</h3>
-          <div class="toolbar">
-            <select id="monthSelect"></select>
-            <select id="yearSelect"></select>
-            <select id="statusFilter">
-              <option value="all">All</option>
-              <option value="unpaid">Unpaid</option>
-              <option value="paid">Paid</option>
-            </select>
-            ${isAdmin ? '<button id="recordPaymentBtn">Record Payment</button>' : ''}
-            ${isAdmin ? '<button class="secondary" id="bulkMarkPaidBtn">Mark Selected as Paid</button>' : ''}
+          <div class="toolbar" style="flex-direction: column; gap: 24px;">
+            <div style="display: flex; gap: 16px; justify-content:flex-start; flex-wrap:nowrap;">
+              <select id="yearSelect"></select>
+              <select id="monthSelect"></select>
+              <select id="statusFilter">
+                <option value="all">All</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+              <div style="gap: 16px;display: flex;">
+                ${isAdmin ? '<button id="recordPaymentBtn">Record Payment</button>' : ''}
+                ${isAdmin ? '<button class="secondary" id="bulkMarkPaidBtn">Mark Selected as Paid</button>' : ''}
+              </div>
+              ${
+                isAdmin
+                  ? `<div style="gap: 16px;display: flex;">
+                      <button type="button" class="secondary" id="exportDuesBtn">Export CSV</button>
+                      <button type="button" class="secondary" id="exportDuesPdfBtn">Export PDF</button>
+                    </div>`
+                  : ''
+              }
+            </div>
           </div>
         </div>
         <table>
@@ -52,8 +66,9 @@ window.MaintenancePage = {
       this.state.statusFilter = e.target.value;
       this.renderRows();
     });
-
     if (isAdmin) {
+      document.getElementById('exportDuesBtn').addEventListener('click', () => this.exportCsv());
+      document.getElementById('exportDuesPdfBtn').addEventListener('click', () => this.exportPdf());
       document.getElementById('recordPaymentBtn').addEventListener('click', () => this.showRecordPaymentModal());
       document.getElementById('bulkMarkPaidBtn').addEventListener('click', () => this.bulkMarkPaid());
     }
@@ -122,9 +137,7 @@ window.MaintenancePage = {
     }
   },
 
-  renderRows() {
-    const user = Api.getUser();
-    const isAdmin = Util.isAdmin(user);
+  getFilteredSortedPayments() {
     const filter = this.state.statusFilter;
     const statusRank = { paid: 0, partial: 1, unpaid: 1 };
     // Matches the CAST(site_no AS INTEGER), site_no ordering used for Members - a fixed per-item
@@ -134,7 +147,7 @@ window.MaintenancePage = {
       const n = parseInt(siteNo, 10);
       return Number.isNaN(n) ? 0 : n;
     };
-    const payments = (filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter))
+    return (filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter))
       .slice()
       .sort(
         (a, b) =>
@@ -142,6 +155,42 @@ window.MaintenancePage = {
           siteNoNumericKey(a.site_no) - siteNoNumericKey(b.site_no) ||
           String(a.site_no || '').localeCompare(String(b.site_no || ''))
       );
+  },
+
+  exportCsv() {
+    const payments = this.getFilteredSortedPayments();
+    const rows = [
+      ['Site No', 'Member', 'Amount Due', 'Amount Paid', 'Paid Date', 'Mode', 'Reference', 'Status'],
+      ...payments.map((p) => [p.site_no || '', p.member_name, p.amount_due, p.amount_paid, p.paid_date || '', p.payment_mode || '', p.reference_no || '', p.status]),
+    ];
+    Util.downloadCsv(`maintenance-dues-${Util.monthName(this.state.month)}-${this.state.year}.csv`, rows);
+  },
+
+  exportPdf() {
+    const payments = this.getFilteredSortedPayments();
+    const columns = ['Site No', 'Member', 'Amount Due', 'Amount Paid', 'Paid Date', 'Mode', 'Reference', 'Status'];
+    const rows = payments.map((p) => [
+      p.site_no || '-',
+      p.member_name,
+      Util.moneyPlain(p.amount_due),
+      Util.moneyPlain(p.amount_paid),
+      Util.formatDate(p.paid_date),
+      p.payment_mode || '-',
+      p.reference_no || '-',
+      p.status,
+    ]);
+    Util.downloadPdf(
+      `maintenance-dues-${Util.monthName(this.state.month)}-${this.state.year}.pdf`,
+      `Maintenance Dues - ${Util.monthName(this.state.month)} ${this.state.year}`,
+      columns,
+      rows
+    );
+  },
+
+  renderRows() {
+    const user = Api.getUser();
+    const isAdmin = Util.isAdmin(user);
+    const payments = this.getFilteredSortedPayments();
 
     const rows = document.getElementById('paymentRows');
     if (!payments.length) {

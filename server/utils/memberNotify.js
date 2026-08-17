@@ -24,4 +24,4 @@ async function notifyMember(member, text) {
   }
 }
 
-module.exports = { notifyMember, welcomeMessage };
+module.exports = { notifyMember, welcomeMessage, appName };

@@ -1,6 +1,8 @@
 window.MembersPage = {
   editingId: null,
   selectedIds: new Set(),
+  allMembers: [],
+  filterState: { search: '', status: 'all' },
 
   async render(container) {
     const user = Api.getUser();
@@ -11,29 +13,59 @@ window.MembersPage = {
       <div id="alertBox"></div>
       ${isAdmin ? '<div class="panel" id="bulkPanel"></div>' : ''}
       ${isAdmin ? '<div class="panel" id="formPanel"></div>' : ''}
-      <div class="panel">
-        <div class="panel-header">
-          <h3>All Members</h3>
-          ${
-            isAdmin
-              ? `<div class="toolbar">
-                  <select id="bulkStatusSelect">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                  <button class="secondary" id="bulkStatusBtn">Apply to Selected</button>
-                </div>`
-              : ''
+      <div class="panel" style="container-type: inline-size;">
+        <style>
+          @container (max-width: 850px) {
+            #membersHeaderRow { flex-direction: column; align-items: stretch; }
+            #membersHeaderRow > .toolbar { justify-content: flex-start !important; }
           }
+        </style>
+        <div class="panel-header" style="flex-direction:column; align-items:stretch; gap:10px;">
+          <h3 style="margin:0; text-align:center;">All Members</h3>
+          <div class="toolbar" id="membersHeaderRow" style="justify-content:space-between;">
+            <div class="toolbar" style="justify-content:flex-start; flex-wrap:nowrap;">
+              <input type="search" id="memberSearchInput" placeholder="Search by Site No or Name..." style="max-width:220px; flex-shrink:0;" />
+              <select id="memberStatusFilter" style="max-width:150px; flex-shrink:0;">
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              ${isAdmin ? '<button type="button" class="secondary" id="exportMembersBtn" style="flex-shrink:0;">Export CSV</button>' : ''}
+              ${isAdmin ? '<button type="button" class="secondary" id="exportMembersPdfBtn" style="flex-shrink:0;">Export PDF</button>' : ''}
+            </div>
+            <div class="toolbar" style="justify-content:flex-end; flex-wrap:nowrap;">
+              ${
+                isAdmin
+                  ? `<select id="bulkStatusSelect" style="max-width:150px; flex-shrink:0;">
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                    <button class="secondary" id="bulkStatusBtn" style="flex-shrink:0;">Apply to Selected</button>`
+                  : ''
+              }
+            </div>
+          </div>
         </div>
         <table>
-          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th>${isAdmin ? '<th>Phone</th>' : ''}<th>Email</th><th>Joined</th><th>Status</th><th>Inactive Since</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody id="rows"><tr><td colspan="${isAdmin ? 9 : 6}">Loading…</td></tr></tbody>
+          <thead><tr>${isAdmin ? '<th><input type="checkbox" id="selectAllMembers" /></th>' : ''}<th>Site No</th><th>Name</th>${isAdmin ? '<th>Phone</th>' : ''}<th>Joined</th><th>Status</th><th>Inactive Since</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="${isAdmin ? 8 : 5}">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
 
+    document.getElementById('memberSearchInput').value = this.filterState.search;
+    document.getElementById('memberSearchInput').addEventListener('input', (e) => {
+      this.filterState.search = e.target.value;
+      this.renderFilteredRows();
+    });
+    document.getElementById('memberStatusFilter').value = this.filterState.status;
+    document.getElementById('memberStatusFilter').addEventListener('change', (e) => {
+      this.filterState.status = e.target.value;
+      this.renderFilteredRows();
+    });
     if (isAdmin) {
+      document.getElementById('exportMembersBtn').addEventListener('click', () => this.exportCsv());
+      document.getElementById('exportMembersPdfBtn').addEventListener('click', () => this.exportPdf());
       this.renderBulkPanel(document.getElementById('bulkPanel'));
       this.renderForm(document.getElementById('formPanel'), null);
       document.getElementById('bulkStatusBtn').addEventListener('click', () => this.applyBulkStatus());
@@ -166,12 +198,55 @@ window.MembersPage = {
   },
 
   async loadRows() {
+    this.allMembers = await Api.get('/members');
+    this.renderFilteredRows();
+  },
+
+  getFilteredMembers() {
+    const search = this.filterState.search.trim().toLowerCase();
+    const statusFilter = this.filterState.status;
+    return this.allMembers.filter((m) => {
+      if (statusFilter !== 'all' && m.status !== statusFilter) return false;
+      if (search) {
+        const siteNo = (m.site_no || '').toLowerCase();
+        const name = (m.name || '').toLowerCase();
+        if (!siteNo.includes(search) && !name.includes(search)) return false;
+      }
+      return true;
+    });
+  },
+
+  exportCsv() {
+    const members = this.getFilteredMembers();
+    const rows = [
+      ['Site No', 'Name', 'Phone', 'Email', 'Joined', 'Status', 'Inactive Since'],
+      ...members.map((m) => [m.site_no || '', m.name, m.phone || '', m.email || '', m.join_date || '', m.status, m.inactive_date || '']),
+    ];
+    Util.downloadCsv(`members-${Util.todayISO()}.csv`, rows);
+  },
+
+  exportPdf() {
+    const members = this.getFilteredMembers();
+    const columns = ['Site No', 'Name', 'Phone', 'Email', 'Joined', 'Status', 'Inactive Since'];
+    const rows = members.map((m) => [
+      m.site_no || '-',
+      m.name,
+      m.phone || '-',
+      m.email || '-',
+      Util.formatDate(m.join_date),
+      m.status,
+      Util.formatDate(m.inactive_date),
+    ]);
+    Util.downloadPdf(`members-${Util.todayISO()}.pdf`, 'Members Report', columns, rows);
+  },
+
+  renderFilteredRows() {
     const user = Api.getUser();
     const isAdmin = Util.isAdmin(user);
-    const members = await Api.get('/members');
+    const members = this.getFilteredMembers();
     const rows = document.getElementById('rows');
     if (!members.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="${isAdmin ? 9 : 6}">No members yet</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="${isAdmin ? 8 : 5}">No members match this view</td></tr>`;
       return;
     }
     rows.innerHTML = members
@@ -182,7 +257,6 @@ window.MembersPage = {
         <td>${Util.escapeHtml(m.site_no || '-')}</td>
         <td>${Util.escapeHtml(m.name)}</td>
         ${isAdmin ? `<td>${Util.escapeHtml(m.phone || '-')}</td>` : ''}
-        <td>${Util.escapeHtml(m.email || '-')}</td>
         <td>${Util.formatDate(m.join_date)}</td>
         <td><span class="badge ${m.status}">${m.status}</span></td>
         <td>${Util.formatDate(m.inactive_date)}</td>

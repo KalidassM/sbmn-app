@@ -19,6 +19,39 @@ router.get('/', requireAuth, (req, res) => {
   res.json(members.map((m) => redactPhone(m, req)));
 });
 
+// Self-service profile - must be registered before GET/PUT /:id, otherwise "me" would be captured
+// as an :id value (same route-ordering pitfall as bulk-status below).
+router.get('/me', requireAuth, (req, res) => {
+  if (!req.user.member_id) return res.json(null);
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.user.member_id);
+  res.json(member || null);
+});
+
+// Lets a logged-in user update their own contact details. Deliberately narrower than the
+// admin-only PUT /:id: no site_no, join_date, status, or inactive_date - those stay
+// admin-managed regardless of what the request body contains.
+router.put('/me', requireAuth, (req, res) => {
+  if (!req.user.member_id) return res.status(400).json({ error: 'No member profile is linked to this account' });
+  const existing = db.prepare('SELECT * FROM members WHERE id = ?').get(req.user.member_id);
+  if (!existing) return res.status(404).json({ error: 'Member not found' });
+  const { phone, email, address } = req.body || {};
+  db.prepare('UPDATE members SET phone = ?, email = ?, address = ? WHERE id = ?').run(
+    phone ?? existing.phone,
+    email ?? existing.email,
+    address ?? existing.address,
+    existing.id
+  );
+  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(existing.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'member',
+    entityId: member.id,
+    description: `${member.name} updated their own profile`,
+  });
+  res.json(member);
+});
+
 router.get('/:id', requireAuth, (req, res) => {
   const member = db.prepare('SELECT * FROM members WHERE id = ?').get(req.params.id);
   if (!member) return res.status(404).json({ error: 'Member not found' });

@@ -135,14 +135,20 @@ window.CoreMembersPage = {
           notes: document.getElementById('f_notes').value.trim(),
           ...(isEdit ? (photo ? { photo } : {}) : { photo: photo || null }),
         };
+        let accountNote = '';
         if (isEdit) {
           await Api.put(`/core-members/${row.id}`, payload);
         } else {
-          await Api.post('/core-members', payload);
+          const result = await Api.post('/core-members', payload);
+          if (result.account?.action === 'created') {
+            accountNote = ` An admin login account (username ${result.account.username}) was created for them.`;
+          } else if (result.account?.action === 'upgraded') {
+            accountNote = ` Their existing login account (${result.account.username}) was upgraded to admin.`;
+          }
         }
         this.renderForm(panel, null);
         await this.loadRows();
-        this.showAlert(isEdit ? 'Updated.' : 'Assigned.', 'success');
+        this.showAlert((isEdit ? 'Updated.' : 'Assigned.') + accountNote, 'success');
       } catch (err) {
         this.showAlert(err.message);
       } finally {
