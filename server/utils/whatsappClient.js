@@ -20,6 +20,8 @@ let sock = null;
 let status = 'disconnected'; // 'disconnected' | 'connecting' | 'qr' | 'connected'
 let latestQr = null;
 let reconnectTimer = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_DELAY_MS = 5 * 60 * 1000;
 
 async function connect() {
   status = 'connecting';
@@ -45,17 +47,26 @@ async function connect() {
     if (connection === 'open') {
       latestQr = null;
       status = 'connected';
+      reconnectAttempts = 0;
       console.log('WhatsApp linked and connected.');
     } else if (connection === 'close') {
       status = 'disconnected';
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
-      console.log(`WhatsApp connection closed (${statusCode || 'unknown'}).${loggedOut ? ' Logged out - clearing session.' : ' Reconnecting...'}`);
       if (loggedOut) {
+        console.log(`WhatsApp connection closed (${statusCode}). Logged out - clearing session.`);
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        reconnectAttempts = 0;
       } else {
+        // Exponential backoff (5s, 10s, 20s... capped at 5min) - a fixed 5s retry would hammer
+        // WhatsApp's servers indefinitely on a persistent failure (e.g. a temporary rate-limit on
+        // repeated device-link attempts), which likely only prolongs the block instead of letting
+        // it expire.
+        const delay = Math.min(5000 * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY_MS);
+        reconnectAttempts++;
+        console.log(`WhatsApp connection closed (${statusCode || 'unknown'}). Retrying in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempts})...`);
         clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(() => connect().catch((err) => console.error('WhatsApp reconnect failed:', err.message)), 5000);
+        reconnectTimer = setTimeout(() => connect().catch((err) => console.error('WhatsApp reconnect failed:', err.message)), delay);
       }
     }
   });
@@ -101,15 +112,17 @@ async function sendMessage(phone, text) {
 
 function logout() {
   if (sock) {
-    try {
-      sock.logout();
-    } catch (err) {
-      // already disconnected - fine, we're clearing the session below regardless
-    }
+    // sock.logout() is async - a broken/already-invalid connection rejects the returned promise
+    // rather than throwing synchronously, so a plain try/catch here would not catch it and the
+    // rejection would go unhandled and crash the process. We're clearing the session below
+    // regardless of whether the logout message actually made it to WhatsApp's servers.
+    sock.logout().catch(() => {});
   }
   fs.rmSync(AUTH_DIR, { recursive: true, force: true });
   status = 'disconnected';
   latestQr = null;
+  reconnectAttempts = 0;
+  clearTimeout(reconnectTimer);
 }
 
 module.exports = { connect, getStatus, getQrDataUrl, isConnected, sendMessage, logout };

@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { requireAuth, JWT_SECRET } = require('../middleware/auth');
 const whatsapp = require('../utils/whatsappClient');
+const { logActivity } = require('../utils/activityLog');
 
 const RESET_CODE_TTL_MINUTES = 15;
 
@@ -19,6 +20,7 @@ router.post('/login', (req, res) => {
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
+  db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
   const token = jwt.sign(
     { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: !!user.must_change_password },
     JWT_SECRET,
@@ -45,6 +47,13 @@ router.post('/change-password', requireAuth, (req, res) => {
   }
   const hash = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hash, user.id);
+  logActivity({
+    actor: user.username,
+    action: 'update',
+    entityType: 'user',
+    entityId: user.id,
+    description: `${user.username} changed their own password`,
+  });
 
   // Issue a fresh token/user so the client can clear the forced-change-password state without
   // having to log in again - the old token's must_change_password claim would otherwise stick
@@ -122,6 +131,13 @@ router.post('/reset-password', (req, res) => {
   db.prepare(
     'UPDATE users SET password_hash = ?, must_change_password = 0, reset_code_hash = NULL, reset_code_expires_at = NULL WHERE id = ?'
   ).run(hash, user.id);
+  logActivity({
+    actor: user.username,
+    action: 'update',
+    entityType: 'user',
+    entityId: user.id,
+    description: `${user.username} reset their password via forgot-password`,
+  });
 
   const token = jwt.sign(
     { id: user.id, username: user.username, role: user.role, member_id: user.member_id, must_change_password: false },

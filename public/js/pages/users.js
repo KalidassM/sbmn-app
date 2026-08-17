@@ -34,8 +34,8 @@ window.UsersPage = {
       <div class="panel">
         <div class="panel-header"><h3>Accounts</h3></div>
         <table>
-          <thead><tr><th>Username</th><th>Role</th><th>Linked Member</th><th></th></tr></thead>
-          <tbody id="rows"><tr><td colspan="4">Loading…</td></tr></tbody>
+          <thead><tr><th>Username</th><th>Role</th><th>Linked Member</th><th>Password</th><th>Last Login</th><th></th></tr></thead>
+          <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -126,6 +126,8 @@ window.UsersPage = {
         <td>${Util.escapeHtml(u.username)}</td>
         <td><span class="badge ${['admin', 'super_admin'].includes(u.role) ? 'active' : 'partial'}">${u.role.replace('_', ' ')}</span></td>
         <td>${Util.escapeHtml(u.member_name || '-')}</td>
+        <td>${u.must_change_password ? '<span class="badge unpaid">must change on login</span>' : '-'}</td>
+        <td>${u.last_login_at ? Util.formatDate(u.last_login_at) : '<span class="text-muted">never</span>'}</td>
         <td class="toolbar">
           ${isSuperAdmin ? `<button class="small secondary" data-reset="${u.id}">Reset Password</button>` : ''}
           ${u.username !== 'admin' ? `<button class="small danger" data-del="${u.id}">Delete</button>` : ''}

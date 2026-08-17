@@ -1,4 +1,12 @@
 require('dotenv').config();
+
+// Safety net: an unhandled promise rejection anywhere (a flaky WhatsApp socket call, a stray
+// fire-and-forget notification, etc.) would otherwise crash the entire process and take the whole
+// app offline for every member/admin until it's manually restarted. Log it and keep running.
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled promise rejection (process kept alive):', err);
+});
+
 const path = require('path');
 const express = require('express');
 const cors = require('cors');

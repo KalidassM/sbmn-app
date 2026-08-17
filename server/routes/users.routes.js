@@ -5,13 +5,23 @@ const { requireAuth, requireAdmin, requireSuperAdmin } = require('../middleware/
 const { logActivity } = require('../utils/activityLog');
 const { firstPhoneDigits } = require('../utils/phone');
 const { ensureCoreMemberAccount } = require('../utils/coreMemberAccount');
+const { notifyMember, appName } = require('../utils/memberNotify');
+const { portalUrl } = require('../utils/appUrl');
+
+// A newly-created account's WhatsApp number: the linked member's phone, or - for accounts not
+// linked to a member - the username itself if it looks like a phone number, matching the
+// "username = phone number" convention used everywhere else in this app.
+function resolveAccountPhone(username, member) {
+  if (member?.phone) return member.phone;
+  return /^\d{10}$/.test(username) ? username : null;
+}
 
 const router = express.Router();
 
 router.get('/', requireAuth, requireAdmin, (req, res) => {
   const rows = db
     .prepare(
-      `SELECT u.id, u.username, u.role, u.member_id, m.name AS member_name, u.created_at
+      `SELECT u.id, u.username, u.role, u.member_id, m.name AS member_name, u.created_at, u.must_change_password, u.last_login_at
        FROM users u LEFT JOIN members m ON m.id = u.member_id ORDER BY u.username`
     )
     .all();
@@ -28,7 +38,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   const hash = bcrypt.hashSync(password, 10);
   try {
     const info = db
-      .prepare('INSERT INTO users (username, password_hash, role, member_id) VALUES (?, ?, ?, ?)')
+      .prepare('INSERT INTO users (username, password_hash, role, member_id, must_change_password) VALUES (?, ?, ?, ?, 1)')
       .run(username, hash, finalRole, member_id || null);
     const row = db.prepare('SELECT id, username, role, member_id FROM users WHERE id = ?').get(info.lastInsertRowid);
     logActivity({
@@ -38,6 +48,17 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
       entityId: row.id,
       description: `Created user ${row.username} (role: ${row.role})`,
     });
+
+    const member = row.member_id ? db.prepare('SELECT name, phone FROM members WHERE id = ?').get(row.member_id) : null;
+    const phone = resolveAccountPhone(row.username, member);
+    if (phone) {
+      const name = member?.name || row.username;
+      notifyMember(
+        { phone },
+        `Hi ${name}, your login account for ${appName()} has been created. Username: ${row.username}, Password: ${password}. Please log in at ${portalUrl()} and change your password.`
+      );
+    }
+
     res.status(201).json(row);
   } catch (err) {
     res.status(400).json({ error: 'Username already exists' });

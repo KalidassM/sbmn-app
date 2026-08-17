@@ -1,17 +1,12 @@
 const db = require('../db');
 const { ensureDuesGenerated } = require('./maintenanceDues');
 const whatsapp = require('./whatsappClient');
+const { baseUrl } = require('./appUrl');
 
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const DEFAULT_REMINDER_DAYS = '1,2,3,4,5,7,10';
 const DEFAULT_REMINDER_TIME = '10:00';
-
-function baseUrl() {
-  if (process.env.APP_PUBLIC_URL) return process.env.APP_PUBLIC_URL.replace(/\/$/, '');
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
-  return 'http://localhost:3000';
-}
 
 function nowIST() {
   const parts = new Intl.DateTimeFormat('en-CA', {

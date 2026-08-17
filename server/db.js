@@ -314,6 +314,12 @@ if (!usersColumns.includes('reset_code_expires_at')) {
   db.exec('ALTER TABLE users ADD COLUMN reset_code_expires_at TEXT');
 }
 
+// Migration: track when an account last logged in, so a Super Admin can tell whether a
+// bulk-created member/core-member account has ever actually been used
+if (!usersColumns.includes('last_login_at')) {
+  db.exec('ALTER TABLE users ADD COLUMN last_login_at TEXT');
+}
+
 // Seed a default admin account on first run
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
 if (userCount === 0) {
