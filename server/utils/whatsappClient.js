@@ -37,7 +37,7 @@ async function notifyAdminOfDisconnect(reason) {
     const appName = settings?.app_name || 'the Association';
     await sendMail({
       to,
-      subject: `${appName} - WhatsApp disconnected`,
+      subject: `${appName} - WhatsApp disconnected in ${baseUrl()}`,
       html: `<p>The WhatsApp connection used for reminders and notifications on the ${appName} portal has ${reason}.</p>
              <p>Go to General Settings &rarr; WhatsApp Reminders to check the status${
                reason.includes('unlinked') ? ' and re-link it by scanning a new QR code.' : ' - it will keep retrying automatically.'
