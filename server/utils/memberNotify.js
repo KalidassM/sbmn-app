@@ -7,9 +7,14 @@ function appName() {
   return settings?.app_name || 'the Association';
 }
 
+// Appended to every outbound WhatsApp message as a consistent branded sign-off.
+function signOff() {
+  return `~ *${appName()}* ~`;
+}
+
 function welcomeMessage(member) {
   const siteBit = member.site_no ? ` (Site No ${member.site_no})` : '';
-  return `Welcome ${member.name}! You've been added as a member of ${appName()}${siteBit}. We're glad to have you with us. Visit the portal: ${portalUrl()}`;
+  return `Welcome ${member.name}! You've been added as a member of ${appName()}${siteBit}. We're glad to have you with us. Visit the portal: ${portalUrl()}\n\n${signOff()}`;
 }
 
 // Sends a WhatsApp message to a member via the linked admin session (server/utils/whatsappClient.js).
@@ -25,4 +30,4 @@ async function notifyMember(member, text) {
   }
 }
 
-module.exports = { notifyMember, welcomeMessage, appName };
+module.exports = { notifyMember, welcomeMessage, appName, signOff };

@@ -32,7 +32,7 @@ window.ActivityLogPage = {
         .map(
           (e) => `
         <tr>
-          <td>${Util.formatDate(e.created_at)}</td>
+          <td>${Util.formatDateTime(e.created_at)}</td>
           <td>${Util.escapeHtml(e.actor || '-')}</td>
           <td><span class="badge">${Util.escapeHtml(e.action)}</span></td>
           <td>${Util.escapeHtml(e.entity_type)}${e.entity_id ? ` #${e.entity_id}` : ''}</td>

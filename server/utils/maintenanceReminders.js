@@ -2,6 +2,7 @@ const db = require('../db');
 const { ensureDuesGenerated } = require('./maintenanceDues');
 const whatsapp = require('./whatsappClient');
 const { baseUrl } = require('./appUrl');
+const { signOff } = require('./memberNotify');
 
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -50,8 +51,6 @@ async function sendDailyReminders({ force = false } = {}) {
     return { skipped: true, reason: `Already sent today (${dateKey})` };
   }
 
-  const appName = settings?.app_name || 'Sri Balamurugan Nagar Welfare Association';
-
   ensureDuesGenerated(month, year);
 
   const dues = db
@@ -85,7 +84,7 @@ async function sendDailyReminders({ force = false } = {}) {
       `*Hi ${due.name},*  This is a reminder that your maintenance due of *₹${remaining} ` +
       `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'})* is still pending.\n\n` +
       `*Pay Now:* ${link}\n\n` +
-      ` ~ *Sri Balamurugan Nagar Welfare Association* ~ `;
+      signOff();
     try {
       await whatsapp.sendMessage(due.phone, message);
       sent.push(due.name);

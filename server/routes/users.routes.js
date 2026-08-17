@@ -5,7 +5,7 @@ const { requireAuth, requireAdmin, requireSuperAdmin } = require('../middleware/
 const { logActivity } = require('../utils/activityLog');
 const { firstPhoneDigits } = require('../utils/phone');
 const { ensureCoreMemberAccount } = require('../utils/coreMemberAccount');
-const { notifyMember, appName } = require('../utils/memberNotify');
+const { notifyMember, appName, signOff } = require('../utils/memberNotify');
 const { portalUrl } = require('../utils/appUrl');
 
 // A newly-created account's WhatsApp number: the linked member's phone, or - for accounts not
@@ -55,7 +55,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
       const name = member?.name || row.username;
       notifyMember(
         { phone },
-        `Hi ${name}, your login account for ${appName()} has been created. Username: ${row.username}, Password: ${password}. Please log in at ${portalUrl()} and change your password.`
+        `Hi ${name}, your login account for ${appName()} has been created. Username: ${row.username}, Password: ${password}. Please log in at ${portalUrl()} and change your password.\n\n${signOff()}`
       );
     }
 

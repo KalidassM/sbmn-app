@@ -1,6 +1,7 @@
 const express = require('express');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const whatsapp = require('../utils/whatsappClient');
+const { signOff } = require('../utils/memberNotify');
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.post('/test', requireAuth, requireAdmin, async (req, res) => {
   const phone = (req.body?.phone || '').trim();
   if (!phone) return res.status(400).json({ error: 'Enter a phone number' });
   try {
-    await whatsapp.sendMessage(phone, 'This is a test message from your SBMN app. If you received this, WhatsApp reminders are working correctly.');
+    await whatsapp.sendMessage(phone, `This is a test message from your SBMN app. If you received this, WhatsApp reminders are working correctly.\n\n${signOff()}`);
     res.json({ ok: true });
   } catch (err) {
     res.status(502).json({ error: err.message });

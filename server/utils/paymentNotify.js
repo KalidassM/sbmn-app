@@ -1,6 +1,7 @@
 const db = require('../db');
 const { sendMail, isConfigured } = require('./mailer');
 const whatsapp = require('./whatsappClient');
+const { signOff } = require('./memberNotify');
 
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -45,19 +46,18 @@ async function notifyPaymentWhatsApp(dues) {
     const member = db.prepare('SELECT name, site_no, phone FROM members WHERE id = ?').get(dues[0].member_id);
     if (!member) return;
 
-    const settings = db.prepare('SELECT app_name, phone_number FROM general_settings WHERE id = 1').get();
-    const appName = settings?.app_name || 'the Association';
+    const settings = db.prepare('SELECT phone_number FROM general_settings WHERE id = 1').get();
     const totalPaid = dues.reduce((sum, d) => sum + Number(d.amount_paid), 0);
     const monthsText = dues.map((d) => `${MONTH_NAMES[d.month]} ${d.year}`).join(', ');
     const monthWord = dues.length > 1 ? `${dues.length} months` : '1 month';
 
     if (member.phone) {
-      const memberText = `Hi ${member.name}, your payment of ₹${totalPaid} for ${monthsText} has been received. Thank you! - ${appName}`;
+      const memberText = `Hi ${member.name}, your payment of ₹${totalPaid} for ${monthsText} has been received. Thank you!\n\n${signOff()}`;
       whatsapp.sendMessage(member.phone, memberText).catch((err) => console.error('Payment WhatsApp to member failed:', err.message));
     }
 
     if (settings?.phone_number) {
-      const adminText = `Payment received: ₹${totalPaid} from ${member.name} (Site No ${member.site_no || '-'}) for ${monthsText} (${monthWord}).`;
+      const adminText = `Payment received: ₹${totalPaid} from ${member.name} (Site No ${member.site_no || '-'}) for ${monthsText} (${monthWord}).\n\n${signOff()}`;
       whatsapp.sendMessage(settings.phone_number, adminText).catch((err) => console.error('Payment WhatsApp to admin failed:', err.message));
     }
   } catch (err) {
@@ -85,17 +85,16 @@ async function notifyDonationWhatsApp(donation) {
     }
     donorName = donorName || 'Donor';
 
-    const settings = db.prepare('SELECT app_name, phone_number FROM general_settings WHERE id = 1').get();
-    const appName = settings?.app_name || 'the Association';
+    const settings = db.prepare('SELECT phone_number FROM general_settings WHERE id = 1').get();
     const purposeText = donation.purpose ? ` for ${donation.purpose}` : '';
 
     if (donorPhone) {
-      const donorText = `Hi ${donorName}, thank you! Your donation of ₹${donation.amount}${purposeText} has been received. - ${appName}`;
+      const donorText = `Hi ${donorName}, thank you! Your donation of ₹${donation.amount}${purposeText} has been received.\n\n${signOff()}`;
       whatsapp.sendMessage(donorPhone, donorText).catch((err) => console.error('Donation WhatsApp to donor failed:', err.message));
     }
 
     if (settings?.phone_number) {
-      const adminText = `Donation received: ₹${donation.amount} from ${donorName}${purposeText}.`;
+      const adminText = `Donation received: ₹${donation.amount} from ${donorName}${purposeText}.\n\n${signOff()}`;
       whatsapp.sendMessage(settings.phone_number, adminText).catch((err) => console.error('Donation WhatsApp to admin failed:', err.message));
     }
   } catch (err) {

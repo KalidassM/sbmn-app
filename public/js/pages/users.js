@@ -127,7 +127,7 @@ window.UsersPage = {
         <td><span class="badge ${['admin', 'super_admin'].includes(u.role) ? 'active' : 'partial'}">${u.role.replace('_', ' ')}</span></td>
         <td>${Util.escapeHtml(u.member_name || '-')}</td>
         <td>${u.must_change_password ? '<span class="badge unpaid">must change on login</span>' : '-'}</td>
-        <td>${u.last_login_at ? Util.formatDate(u.last_login_at) : '<span class="text-muted">never</span>'}</td>
+        <td>${u.last_login_at ? Util.formatDateTime(u.last_login_at) : '<span class="text-muted">never</span>'}</td>
         <td class="toolbar">
           ${isSuperAdmin ? `<button class="small secondary" data-reset="${u.id}">Reset Password</button>` : ''}
           ${u.username !== 'admin' ? `<button class="small danger" data-del="${u.id}">Delete</button>` : ''}

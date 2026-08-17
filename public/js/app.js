@@ -35,6 +35,23 @@ const Util = {
     const [, y, m, d, rest] = match;
     return `${d}/${m}/${y}${rest}`;
   },
+  // Reformats a "YYYY-MM-DD HH:MM:SS" timestamp from the DB (SQLite's datetime('now') stores UTC,
+  // with no timezone suffix) into DD/MM/YYYY hh:mm AM/PM in India time - showing the raw UTC value
+  // as-is would look ~5:30 hours off from what actually happened locally.
+  formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(String(dateStr).replace(' ', 'T') + 'Z');
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  },
   isAdmin(user) {
     return !!user && (user.role === 'admin' || user.role === 'super_admin');
   },
@@ -193,7 +210,7 @@ function renderShell() {
       <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
         <div class="sidebar-brand">
           <a href="#/dashboard" class="brand-link">
-            <span class="brand-text fw-light" id="sidebarBrandText">Sri Balamurugan Nagar Welfare Association</span>
+            <span class="brand-text fw-light" id="sidebarBrandText">SBMN APP</span>
           </a>
         </div>
         <div class="sidebar-wrapper">
@@ -219,7 +236,7 @@ function renderShell() {
   Api.get('/general-settings')
     .then((s) => {
       if (s.app_name) {
-        document.getElementById('sidebarBrandText').textContent = s.app_name;
+        // document.getElementById('sidebarBrandText').textContent = s.app_name;
         document.title = s.app_name;
       }
     })

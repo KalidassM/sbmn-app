@@ -11,6 +11,8 @@ const path = require('path');
 const pino = require('pino');
 const QRCode = require('qrcode');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const db = require('../db');
+const { sendMail, isConfigured: isEmailConfigured } = require('./mailer');
 
 // Stored next to the sqlite DB so it survives redeploys on whatever volume already persists data.sqlite
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data.sqlite');
@@ -22,6 +24,29 @@ let latestQr = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_DELAY_MS = 5 * 60 * 1000;
+
+// Emails the association's contact address the moment the linked WhatsApp session drops - the
+// admin might otherwise only find out because reminders/notifications quietly stopped going out.
+// Never throws, and is only called once per outage (see call sites below), not on every retry.
+async function notifyAdminOfDisconnect(reason) {
+  try {
+    if (!isEmailConfigured()) return;
+    const settings = db.prepare('SELECT contact_email, app_name FROM general_settings WHERE id = 1').get();
+    const to = settings?.contact_email;
+    if (!to) return;
+    const appName = settings?.app_name || 'the Association';
+    await sendMail({
+      to,
+      subject: `${appName} - WhatsApp disconnected`,
+      html: `<p>The WhatsApp connection used for reminders and notifications on the ${appName} portal has ${reason}.</p>
+             <p>Go to General Settings &rarr; WhatsApp Reminders to check the status${
+               reason.includes('unlinked') ? ' and re-link it by scanning a new QR code.' : ' - it will keep retrying automatically.'
+             }</p>`,
+    });
+  } catch (err) {
+    console.error('WhatsApp disconnect email failed:', err.message);
+  }
+}
 
 async function connect() {
   status = 'connecting';
@@ -57,7 +82,14 @@ async function connect() {
         console.log(`WhatsApp connection closed (${statusCode}). Logged out - clearing session.`);
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         reconnectAttempts = 0;
+        notifyAdminOfDisconnect('been unlinked (logged out) - a fresh QR code scan is needed');
       } else {
+        // Only alert on the first failure of a new outage, not on every retry - reconnectAttempts
+        // is still 0 here the first time (it resets to 0 on a successful connect), so this fires
+        // once per outage rather than spamming an email every few seconds while it keeps retrying.
+        if (reconnectAttempts === 0) {
+          notifyAdminOfDisconnect('disconnected unexpectedly and is attempting to reconnect automatically');
+        }
         // Exponential backoff (5s, 10s, 20s... capped at 5min) - a fixed 5s retry would hammer
         // WhatsApp's servers indefinitely on a persistent failure (e.g. a temporary rate-limit on
         // repeated device-link attempts), which likely only prolongs the block instead of letting

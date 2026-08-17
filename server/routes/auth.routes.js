@@ -6,6 +6,7 @@ const db = require('../db');
 const { requireAuth, JWT_SECRET } = require('../middleware/auth');
 const whatsapp = require('../utils/whatsappClient');
 const { logActivity } = require('../utils/activityLog');
+const { signOff } = require('../utils/memberNotify');
 
 const RESET_CODE_TTL_MINUTES = 15;
 
@@ -102,7 +103,7 @@ router.post('/forgot-password', (req, res) => {
 
   const settings = db.prepare('SELECT app_name FROM general_settings WHERE id = 1').get();
   const appName = settings?.app_name || 'the Association';
-  const text = `Your password reset code for ${appName} portal is: ${code}. It expires in ${RESET_CODE_TTL_MINUTES} minutes. If you did not request this, please ignore this message.`;
+  const text = `Your password reset code for ${appName} portal is: ${code}. It expires in ${RESET_CODE_TTL_MINUTES} minutes. If you did not request this, please ignore this message.\n\n${signOff()}`;
 
   whatsapp
     .sendMessage(phone, text)

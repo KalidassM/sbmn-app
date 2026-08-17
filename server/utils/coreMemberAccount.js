@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { firstPhoneDigits } = require('./phone');
-const { notifyMember, appName } = require('./memberNotify');
+const { notifyMember, appName, signOff } = require('./memberNotify');
 const { portalUrl } = require('./appUrl');
 
 // Makes sure a Core Member has an 'admin'-role login account - used both right after a Core
@@ -24,7 +24,7 @@ function ensureCoreMemberAccount(memberId) {
     db.prepare('UPDATE users SET role = ? WHERE id = ?').run('admin', existing.id);
     notifyMember(
       member,
-      `Hi ${member.name}, you've been made a Core Member of ${appName()}. Your existing account (${existing.username}) now has admin access. Visit the portal: ${portalUrl()}`
+      `Hi ${member.name}, you've been made a Core Member of ${appName()}. Your existing account (${existing.username}) now has admin access. Visit the portal: ${portalUrl()}\n\n${signOff()}`
     );
     return { action: 'upgraded', username: existing.username };
   }
@@ -40,7 +40,7 @@ function ensureCoreMemberAccount(memberId) {
     ).run(username, hash, memberId);
     notifyMember(
       member,
-      `Hi ${member.name}, you've been added as a Core Member of ${appName()} with admin portal access. Username: ${username}, Password: ${password}. Please log in at ${portalUrl()} and change your password.`
+      `Hi ${member.name}, you've been added as a Core Member of ${appName()} with admin portal access. Username: ${username}, Password: ${password}. Please log in at ${portalUrl()} and change your password.\n\n${signOff()}`
     );
     return { action: 'created', username };
   } catch (err) {
