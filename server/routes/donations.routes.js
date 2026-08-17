@@ -3,6 +3,7 @@ const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { logActivity } = require('../utils/activityLog');
+const { notifyDonationWhatsApp } = require('../utils/paymentNotify');
 
 const router = express.Router();
 
@@ -30,6 +31,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     )
     .run(member_id || null, donor_name || null, amount, donation_date || null, purpose || null, event_id || null);
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(info.lastInsertRowid);
+  notifyDonationWhatsApp(row);
   logActivity({
     actor: req.user?.username,
     action: 'create',
@@ -176,6 +178,7 @@ router.post('/self/:id/verify', requireAuth, (req, res) => {
   ).run(razorpay_payment_id, donation.id);
 
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(donation.id);
+  notifyDonationWhatsApp(row);
   logActivity({
     actor: req.user?.username,
     action: 'update',
@@ -195,6 +198,7 @@ router.put('/:id/confirm', requireAuth, requireAdmin, (req, res) => {
   }
   db.prepare("UPDATE donations SET status = 'completed', donation_date = date('now') WHERE id = ?").run(req.params.id);
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(req.params.id);
+  notifyDonationWhatsApp(row);
   logActivity({
     actor: req.user?.username,
     action: 'update',

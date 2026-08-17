@@ -4,7 +4,7 @@ const { logActivity } = require('../utils/activityLog');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
-const { notifyAdminOfPayment } = require('../utils/paymentNotify');
+const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymentNotify');
 
 const router = express.Router();
 
@@ -157,10 +157,9 @@ router.post('/pay-multiple/verify', (req, res) => {
   );
   db.transaction((rows) => rows.forEach((d) => markPaid.run(razorpay_payment_id, razorpay_payment_id, d.id)))(dues);
 
-  dues.forEach((d) => {
-    const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(d.id);
-    notifyAdminOfPayment(updated);
-  });
+  const updatedDues = dues.map((d) => db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(d.id));
+  updatedDues.forEach((updated) => notifyAdminOfPayment(updated));
+  notifyPaymentWhatsApp(updatedDues);
   const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(dues[0].member_id);
   const total = dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
   const months = dues.map((d) => `${d.month}/${d.year}`).join(', ');
@@ -235,6 +234,7 @@ router.post('/:id/verify', (req, res) => {
 
   const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
   notifyAdminOfPayment(updated);
+  notifyPaymentWhatsApp([updated]);
   const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updated.member_id);
   logActivity({
     actor: 'public',

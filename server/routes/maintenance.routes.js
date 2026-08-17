@@ -3,7 +3,7 @@ const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
-const { notifyAdminOfPayment } = require('../utils/paymentNotify');
+const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymentNotify');
 const { sendDailyReminders } = require('../utils/maintenanceReminders');
 
 const router = express.Router();
@@ -126,6 +126,7 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
   const row = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);
   if (finalAmountPaid > existing.amount_paid) {
     notifyAdminOfPayment(row);
+    notifyPaymentWhatsApp([row]);
   }
   const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(row.member_id);
   logActivity({

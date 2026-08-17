@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { logActivity } = require('../utils/activityLog');
+const { notifyDonationWhatsApp } = require('../utils/paymentNotify');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
 
@@ -114,6 +115,7 @@ router.post('/:id/verify', (req, res) => {
     `UPDATE donations SET status = 'completed', razorpay_payment_id = ?, donation_date = date('now') WHERE id = ?`
   ).run(razorpay_payment_id, donation.id);
 
+  notifyDonationWhatsApp(donation);
   logActivity({
     actor: 'public',
     action: 'payment',

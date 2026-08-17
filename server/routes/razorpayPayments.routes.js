@@ -3,7 +3,7 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
 const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
-const { notifyAdminOfPayment } = require('../utils/paymentNotify');
+const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymentNotify');
 
 const router = express.Router();
 
@@ -95,6 +95,7 @@ router.post('/verify', requireAuth, (req, res) => {
 
   const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
   notifyAdminOfPayment(updated);
+  notifyPaymentWhatsApp([updated]);
   const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updated.member_id);
   logActivity({
     actor: req.user?.username,
