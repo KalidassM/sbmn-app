@@ -8,6 +8,11 @@ const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymen
 
 const router = express.Router();
 
+// Dues from before this month are old arrears predating what should be collected through this
+// public page - members with older pending dues pay those offline/through the admin instead.
+const OLDEST_PAYABLE_YEAR = 2026;
+const OLDEST_PAYABLE_MONTH = 6;
+
 // An exact Site No match is unambiguous; otherwise fall back to a name search (min 3 chars, capped) to avoid scraping the member list
 function findMembers(query) {
   const q = (query || '').toString().trim();
@@ -33,15 +38,18 @@ router.get('/dues', (req, res) => {
       // the client can show a plain "you're not an active member" message instead of a due list.
       return { member_id: m.id, name: m.name, site_no: m.site_no, inactive: true, dues: [] };
     }
-    // Show the current month plus any missed past months (arrears) - never a future month's due
+    // Show the current month plus any missed past months (arrears) - never a future month's due,
+    // and never anything older than OLDEST_PAYABLE_YEAR/MONTH (those arrears are handled outside
+    // this public page).
     const dues = db
       .prepare(
         `SELECT id, month, year, amount_due, amount_paid, status FROM maintenance_payments
          WHERE member_id = ? AND status != 'paid'
+           AND (year > ? OR (year = ? AND month >= ?))
            AND (year < ? OR (year = ? AND month <= ?))
          ORDER BY year, month`
       )
-      .all(m.id, currentYear, currentYear, currentMonth);
+      .all(m.id, OLDEST_PAYABLE_YEAR, OLDEST_PAYABLE_YEAR, OLDEST_PAYABLE_MONTH, currentYear, currentYear, currentMonth);
     return { member_id: m.id, name: m.name, site_no: m.site_no, inactive: false, dues };
   });
   res.json(results);
