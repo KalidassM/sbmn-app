@@ -58,6 +58,7 @@ window.GeneralSettingsPage = {
             <div class="field"><label>Resend API Key</label><input id="resendApiKey" type="password" placeholder="leave blank to keep current" /></div>
             <div class="field"><label>From Email</label><input id="resendFromEmail" type="email" placeholder="onboarding@resend.dev" /></div>
           </div>
+          <p class="text-muted" style="font-size:0.85rem;">Used to send the payment-received notification above, via <a href="https://resend.com" target="_blank">Resend</a>'s free tier. Get an API key from resend.com/api-keys. Leave From Email blank to use Resend's shared sandbox sender (<code>onboarding@resend.dev</code>) &mdash; no domain setup needed to get started; verify your own domain in Resend later if you want to send from your association's own address.</p>
           <div class="toolbar mt-16">
             <button type="submit">Save</button>
             <button type="button" class="secondary" id="testEmailBtn">Send Test Email</button>
