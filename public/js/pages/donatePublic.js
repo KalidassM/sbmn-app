@@ -102,6 +102,7 @@
             card.innerHTML = `
               <h1>Thank you, ${escapeHtml(donation.donor_name)}! 🙏</h1>
               <p class="sub">Your donation of ${money(donation.amount)} has been received. We truly appreciate your support.</p>
+              <a href="/" class="btn" style="display:block; text-align:center; text-decoration:none; margin-top:16px;">Back to Home</a>
             `;
           } catch (err) {
             gatewayBox.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;

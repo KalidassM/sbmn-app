@@ -159,7 +159,7 @@ router.post('/pay-multiple/verify', (req, res) => {
 
   const markPaid = db.prepare(
     `UPDATE maintenance_payments
-     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), razorpay_payment_id = ?,
+     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), paid_at = datetime('now'), razorpay_payment_id = ?,
          payment_mode = 'Razorpay', reference_no = ?
      WHERE id = ?`
   );
@@ -235,7 +235,7 @@ router.post('/:id/verify', (req, res) => {
 
   db.prepare(
     `UPDATE maintenance_payments
-     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), razorpay_payment_id = ?,
+     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), paid_at = datetime('now'), razorpay_payment_id = ?,
          payment_mode = 'Razorpay', reference_no = ?
      WHERE id = ?`
   ).run(razorpay_payment_id, razorpay_payment_id, due.id);

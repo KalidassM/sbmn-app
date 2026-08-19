@@ -52,6 +52,19 @@ const Util = {
       hour12: true,
     });
   },
+  // Just the time-of-day portion of a "YYYY-MM-DD HH:MM:SS" UTC timestamp, in IST - for showing
+  // alongside a separately-displayed date (e.g. donation_date) without repeating the date part.
+  formatTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(String(dateStr).replace(' ', 'T') + 'Z');
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  },
   isAdmin(user) {
     return !!user && (user.role === 'admin' || user.role === 'super_admin');
   },

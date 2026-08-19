@@ -59,6 +59,7 @@
             <div class="panel" style="margin-top:16px;">
               <div class="panel-header"><h3>${escapeHtml(m.name)} <span class="text-muted" style="font-size:0.8rem;">(Site No ${escapeHtml(m.site_no || '-')})</span></h3></div>
               <p class="text-muted">No outstanding dues — you're all caught up. Thank you!</p>
+              <a href="/" class="btn" style="display:block; text-align:center; text-decoration:none; margin-top:16px;">Back to Home</a>
             </div>`;
         }
         const total = m.dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
@@ -169,6 +170,7 @@
             });
             document.getElementById(`member-total-${m.member_id}`).innerHTML = '<div class="text-muted">All dues settled — thank you! 🙏</div>';
             document.getElementById(`member-pay-${m.member_id}`).innerHTML = '';
+            document.getElementById(`member-pay-${m.member_id}`).innerHTML += '<a href="/" class="btn" style="display:block; text-align:center; text-decoration:none; margin-top:16px;">Back to Home</a>';
           } catch (err) {
             gatewayBox.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
           }

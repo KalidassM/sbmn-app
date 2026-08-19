@@ -50,13 +50,14 @@ router.post('/payments/bulk-mark-paid', requireAuth, requireAdmin, (req, res) =>
   if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids array is required' });
 
   const today = new Date().toISOString().slice(0, 10);
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const update = db.prepare(
-    `UPDATE maintenance_payments SET amount_paid = amount_due, status = 'paid', paid_date = ? WHERE id = ? AND status != 'paid'`
+    `UPDATE maintenance_payments SET amount_paid = amount_due, status = 'paid', paid_date = ?, paid_at = ? WHERE id = ? AND status != 'paid'`
   );
   let updated = 0;
   db.transaction((rowIds) => {
     rowIds.forEach((id) => {
-      updated += update.run(today, id).changes;
+      updated += update.run(today, now, id).changes;
     });
   })(ids);
   logActivity({
@@ -112,12 +113,14 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
     else if (finalAmountPaid >= finalAmountDue) finalStatus = 'paid';
     else finalStatus = 'partial';
   }
+  const becomingPaid = finalStatus === 'paid' && existing.status !== 'paid';
   db.prepare(
-    `UPDATE maintenance_payments SET amount_due = ?, amount_paid = ?, paid_date = ?, status = ?, payment_mode = ?, reference_no = ? WHERE id = ?`
+    `UPDATE maintenance_payments SET amount_due = ?, amount_paid = ?, paid_date = ?, paid_at = ?, status = ?, payment_mode = ?, reference_no = ? WHERE id = ?`
   ).run(
     finalAmountDue,
     finalAmountPaid,
     paid_date ?? (finalStatus === 'paid' ? new Date().toISOString().slice(0, 10) : existing.paid_date),
+    becomingPaid ? new Date().toISOString().slice(0, 19).replace('T', ' ') : existing.paid_at,
     finalStatus,
     payment_mode !== undefined ? payment_mode || null : existing.payment_mode,
     reference_no !== undefined ? reference_no || null : existing.reference_no,

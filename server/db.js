@@ -241,6 +241,12 @@ if (!maintenancePaymentColumns.includes('last_reminder_error')) {
   db.exec('ALTER TABLE maintenance_payments ADD COLUMN last_reminder_error TEXT');
 }
 
+// Migration: record the actual moment a due was marked paid (paid_date stays an editable calendar
+// date; this is a real timestamp, for showing the time alongside it in the admin list)
+if (!maintenancePaymentColumns.includes('paid_at')) {
+  db.exec('ALTER TABLE maintenance_payments ADD COLUMN paid_at TEXT');
+}
+
 // Migration: mark existing expenses as bank-sourced now that petty cash is a second source
 const expenseColumns = db.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name);
 if (!expenseColumns.includes('source')) {
