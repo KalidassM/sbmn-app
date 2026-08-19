@@ -15,7 +15,7 @@ const SELECT_JOIN = `
 `;
 
 router.get('/', requireAuth, (req, res) => {
-  const rows = db.prepare(`${SELECT_JOIN} ORDER BY d.donation_date DESC`).all();
+  const rows = db.prepare(`${SELECT_JOIN} ORDER BY d.donation_date DESC, d.created_at DESC, d.id DESC`).all();
   res.json(rows);
 });
 
