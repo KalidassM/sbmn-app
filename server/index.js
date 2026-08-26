@@ -34,6 +34,7 @@ const generalSettingsRoutes = require('./routes/generalSettings.routes');
 const whatsappRoutes = require('./routes/whatsapp.routes');
 const internalWhatsappRoutes = require('./routes/internalWhatsapp.routes');
 const activityLogRoutes = require('./routes/activityLog.routes');
+const reportsRoutes = require('./routes/reports.routes');
 const whatsapp = require('./utils/whatsappClient');
 const { sendDailyReminders } = require('./utils/maintenanceReminders');
 
@@ -64,6 +65,7 @@ app.use('/api/general-settings', generalSettingsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/internal/whatsapp', internalWhatsappRoutes);
 app.use('/api/activity-log', activityLogRoutes);
+app.use('/api/reports', reportsRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 

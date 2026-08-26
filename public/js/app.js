@@ -167,7 +167,8 @@ const NAV_ITEMS = [
   { path: '#/users', label: 'Login Accounts', icon: 'bi-shield-lock', adminOnly: true },
   { path: '#/payment-settings', label: 'Payment Settings', icon: 'bi-credit-card', superAdminOnly: true },
   { path: '#/general-settings', label: 'General Settings', icon: 'bi-gear', superAdminOnly: true },
-  { path: '#/activity-log', label: 'Activity Log', icon: 'bi-clock-history', adminOnly: true }, 
+  { path: '#/reports', label: 'ITR Report', icon: 'bi-file-earmark-text', adminOnly: true },
+  { path: '#/activity-log', label: 'Activity Log', icon: 'bi-clock-history', adminOnly: true },
 ];
 
 const PAGES = {
@@ -183,6 +184,7 @@ const PAGES = {
   '#/donations': window.DonationsPage,
   '#/contact-messages': window.ContactMessagesPage,
   '#/users': window.UsersPage,
+  '#/reports': window.ReportsPage,
   '#/activity-log': window.ActivityLogPage,
   '#/payment-settings': window.PaymentSettingsPage,
   '#/general-settings': window.GeneralSettingsPage,
