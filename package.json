@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Sri Balamurugan Nagar Welfare Association",
   "main": "server/index.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js"
