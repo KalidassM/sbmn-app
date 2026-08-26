@@ -1,13 +1,5 @@
 require('dotenv').config();
 
-// One-off migration aid: idle without opening the DB/WhatsApp session so a data file swap on the
-// mounted volume can happen with no process holding it open. Unset MAINTENANCE_MODE afterward.
-if (process.env.MAINTENANCE_MODE === 'true') {
-  console.log('MAINTENANCE_MODE=true - idling without touching the DB or WhatsApp');
-  setInterval(() => {}, 1000 * 60 * 60);
-  return;
-}
-
 // Safety net: an unhandled promise rejection anywhere (a flaky WhatsApp socket call, a stray
 // fire-and-forget notification, etc.) would otherwise crash the entire process and take the whole
 // app offline for every member/admin until it's manually restarted. Log it and keep running.

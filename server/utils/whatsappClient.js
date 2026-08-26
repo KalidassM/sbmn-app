@@ -13,6 +13,7 @@ const QRCode = require('qrcode');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const db = require('../db');
 const { sendMail, isConfigured: isEmailConfigured } = require('./mailer');
+const { baseUrl } = require('./appUrl');
 
 // Stored next to the sqlite DB so it survives redeploys on whatever volume already persists data.sqlite
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data.sqlite');
