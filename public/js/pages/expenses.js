@@ -1,3 +1,18 @@
+const EXPENSE_CATEGORIES = [
+  'Waterman Monthly Tips',
+  'Garbage man Tips',
+  'CCTV Sim Recharge',
+  'Plumbing Meterial',
+  'Plumber Expenses',
+  'Electrician Expenses',
+  'Street Light Fix - EB',
+  'Meeting Chair Expenses',
+  'Meeting Snakes Expenses',
+  'Public Place Cleaning Expenses',
+  'Celebration Expenses',
+  'Stationary Expenses',
+];
+
 window.ExpensesPage = {
   currentExpenses: [],
   currentTransactions: [],
@@ -10,6 +25,7 @@ window.ExpensesPage = {
       <h1>Expenses & Petty Cash</h1>
       <p class="page-sub">Track association expenses and the day-to-day petty cash box</p>
       <div id="alertBox"></div>
+      <datalist id="expenseCategoryOptions">${EXPENSE_CATEGORIES.map((c) => `<option value="${Util.escapeHtml(c)}"></option>`).join('')}</datalist>
 
       <div class="stat-grid" id="expenseSummary"></div>
 
@@ -122,7 +138,7 @@ window.ExpensesPage = {
       <form id="expForm">
         <div class="form-grid">
           <div class="field"><label>Title</label><input id="e_title" required value="${Util.escapeHtml(expense?.title || '')}" /></div>
-          <div class="field"><label>Category</label><input id="e_category" placeholder="Cleaning, Security, Repairs..." value="${Util.escapeHtml(expense?.category || '')}" /></div>
+          <div class="field"><label>Category</label><input id="e_category" list="expenseCategoryOptions" placeholder="Cleaning, Security, Repairs..." value="${Util.escapeHtml(expense?.category || '')}" /></div>
           <div class="field"><label>Amount</label><input id="e_amount" type="number" step="0.01" required value="${expense?.amount ?? ''}" /></div>
           <div class="field"><label>Date</label><input id="e_date" type="date" value="${expense?.expense_date || Util.todayISO()}" /></div>
         </div>
@@ -243,7 +259,7 @@ window.ExpensesPage = {
           </div>
           <div class="field"><label>Amount</label><input id="pc_amount" type="number" step="0.01" required value="${txn?.amount ?? ''}" /></div>
           <div class="field"><label>Date</label><input id="pc_date" type="date" value="${txn?.txn_date || Util.todayISO()}" /></div>
-          <div class="field" id="pc_category_field"><label>Category</label><input id="pc_category" placeholder="Stationery, Tea, Misc..." value="${Util.escapeHtml(txn?.category || '')}" /></div>
+          <div class="field" id="pc_category_field"><label>Category</label><input id="pc_category" list="expenseCategoryOptions" placeholder="Stationery, Tea, Misc..." value="${Util.escapeHtml(txn?.category || '')}" /></div>
         </div>
         <div class="field"><label>Description</label><input id="pc_description" required value="${Util.escapeHtml(txn?.description || '')}" /></div>
         <div class="toolbar mt-16">
