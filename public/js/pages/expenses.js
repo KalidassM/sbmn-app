@@ -11,6 +11,7 @@ const EXPENSE_CATEGORIES = [
   'Public Place Cleaning Expenses',
   'Celebration Expenses',
   'Stationary Expenses',
+  'Miscellaneous Expenses',
 ];
 
 window.ExpensesPage = {
