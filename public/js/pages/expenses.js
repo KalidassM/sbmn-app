@@ -344,7 +344,7 @@ window.ExpensesPage = {
         btn.addEventListener('click', () => {
           const txn = this.currentTransactions.find((x) => String(x.id) === btn.dataset.pcEdit);
           this.renderPettyCashForm(txn);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          document.getElementById('pettyCashForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
         })
       );
       rows.querySelectorAll('[data-pc-del]').forEach((btn) =>
