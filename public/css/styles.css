@@ -177,11 +177,13 @@ body {
 
 .panel-header h3 { margin: 0; font-size: 1.05rem; }
 
+#summaryBox h4 { margin: 24px 0 10px; }
+
 table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
-  margin-top: 30px;
+  /* margin-top: 30px; */
 }
 
 th, td {

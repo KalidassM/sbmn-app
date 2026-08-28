@@ -69,16 +69,16 @@ window.ReportsPage = {
         <span class="text-muted">Period: ${Util.formatDate(s.dateRange.start)} – ${Util.formatDate(s.dateRange.end)} (FY ${s.fy})</span>
       </div>
 
-      <h4>Income</h4>
+      <h4 style="color: green;">Income</h4>
       <table>
         <tbody>
           <tr><td>Maintenance dues collected</td><td>${Util.money(s.income.maintenance)}</td></tr>
           <tr><td>Donations received</td><td>${Util.money(s.income.donations)}</td></tr>
-          <tr><td><strong>Total Income</strong></td><td><strong>${Util.money(s.income.total)}</strong></td></tr>
+          <tr><td style="color: green;"><h5>Total Income</h5></td><td style="color: green;"><h5>${Util.money(s.income.total)}</h5></td></tr>
         </tbody>
       </table>
 
-      <h4>Expenses</h4>
+      <h4 style="color: red;">Expenses</h4>
       <table>
         <tbody>
           ${
@@ -86,13 +86,11 @@ window.ReportsPage = {
               ? s.expenses.byCategory.map((c) => `<tr><td>${Util.escapeHtml(c.category)}</td><td>${Util.money(c.amount)}</td></tr>`).join('')
               : '<tr><td colspan="2">No expenses recorded</td></tr>'
           }
-          <tr><td><strong>Total Expenses</strong></td><td><strong>${Util.money(s.expenses.total)}</strong></td></tr>
+          <tr><td style="color: red;"><h5>Total Expenses</h5></td><td style="color: red;"><h5>${Util.money(s.expenses.total)}</h5></td></tr>
         </tbody>
       </table>
 
-      <h4>Net ${s.net >= 0 ? 'Surplus' : 'Deficit'}</h4>
-      <p><strong>${Util.money(Math.abs(s.net))}</strong></p>
-    `;
+      <h4 style="color: #e30bb9;">Net ${s.net >= 0 ? 'Surplus' : 'Deficit'} :  ${Util.money(Math.abs(s.net))}</h4>`;
   },
 
   exportCsv() {
