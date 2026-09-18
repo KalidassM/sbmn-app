@@ -67,8 +67,8 @@ window.MaintenancePage = {
       this.renderRows();
     });
     if (isAdmin) {
-      document.getElementById('exportDuesBtn').addEventListener('click', () => this.exportCsv());
-      document.getElementById('exportDuesPdfBtn').addEventListener('click', () => this.exportPdf());
+      document.getElementById('exportDuesBtn').addEventListener('click', () => this.showExportModal('csv'));
+      document.getElementById('exportDuesPdfBtn').addEventListener('click', () => this.showExportModal('pdf'));
       document.getElementById('recordPaymentBtn').addEventListener('click', () => this.showRecordPaymentModal());
       document.getElementById('bulkMarkPaidBtn').addEventListener('click', () => this.bulkMarkPaid());
     }
@@ -157,19 +157,102 @@ window.MaintenancePage = {
       );
   },
 
-  exportCsv() {
-    const payments = this.getFilteredSortedPayments();
-    const rows = [
-      ['Site No', 'Member', 'Amount Due', 'Amount Paid', 'Paid Date', 'Mode', 'Reference', 'Status'],
-      ...payments.map((p) => [p.site_no || '', p.member_name, p.amount_due, p.amount_paid, p.paid_date || '', p.payment_mode || '', p.reference_no || '', p.status]),
-    ];
-    Util.downloadCsv(`maintenance-dues-${Util.monthName(this.state.month)}-${this.state.year}.csv`, rows);
+  // Builds the inclusive list of {month, year} pairs between two month/year points, regardless
+  // of which end the caller passes first. Capped at 60 months so a mistaken multi-decade range
+  // (or swapped year fields) can't trigger hundreds of API calls.
+  getMonthYearRange(fromMonth, fromYear, toMonth, toYear) {
+    const toIndex = (m, y) => y * 12 + (m - 1);
+    let startIdx = toIndex(fromMonth, fromYear);
+    let endIdx = toIndex(toMonth, toYear);
+    if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
+    endIdx = Math.min(endIdx, startIdx + 59);
+    const pairs = [];
+    for (let idx = startIdx; idx <= endIdx; idx += 1) {
+      pairs.push({ year: Math.floor(idx / 12), month: (idx % 12) + 1 });
+    }
+    return pairs;
   },
 
-  exportPdf() {
-    const payments = this.getFilteredSortedPayments();
-    const columns = ['Site No', 'Member', 'Amount Due', 'Amount Paid', 'Paid Date', 'Mode', 'Reference', 'Status'];
+  getRangeLabel(startDate, endDate) {
+    return startDate === endDate ? startDate : `${startDate}_to_${endDate}`;
+  },
+
+  getRangeTitle(startDate, endDate) {
+    return startDate === endDate ? Util.formatDate(startDate) : `${Util.formatDate(startDate)} – ${Util.formatDate(endDate)}`;
+  },
+
+  async fetchPaymentsForRange(pairs) {
+    const user = Api.getUser();
+    const isAdmin = Util.isAdmin(user);
+    const filter = this.state.statusFilter;
+    const statusRank = { paid: 0, partial: 1, unpaid: 1 };
+    const siteNoNumericKey = (siteNo) => {
+      const n = parseInt(siteNo, 10);
+      return Number.isNaN(n) ? 0 : n;
+    };
+    const results = await Promise.all(pairs.map((p) => Api.get(`/maintenance/payments?month=${p.month}&year=${p.year}`)));
+
+    const rows = [];
+    pairs.forEach((p, idx) => {
+      let payments = results[idx];
+      if (!isAdmin && user.member_id) payments = payments.filter((x) => x.member_id === user.member_id);
+      if (filter !== 'all') payments = payments.filter((x) => x.status === filter);
+      payments
+        .slice()
+        .sort(
+          (a, b) =>
+            statusRank[a.status] - statusRank[b.status] ||
+            siteNoNumericKey(a.site_no) - siteNoNumericKey(b.site_no) ||
+            String(a.site_no || '').localeCompare(String(b.site_no || ''))
+        )
+        .forEach((x) => rows.push({ ...x, _month: p.month, _year: p.year }));
+    });
+    return rows;
+  },
+
+  computeRangeTotals(payments) {
+    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+    const totalPending = payments.reduce((sum, p) => sum + (Number(p.amount_due) - Number(p.amount_paid)), 0);
+    return { totalPaid, totalPending };
+  },
+
+  async exportCsvForRange(pairs, startDate, endDate) {
+    const payments = await this.fetchPaymentsForRange(pairs);
+    const { totalPaid, totalPending } = this.computeRangeTotals(payments);
+    const rangeTitle = this.getRangeTitle(startDate, endDate);
+    const rows = [
+      [`Maintenance Dues - ${rangeTitle}`],
+      [`Paid (${rangeTitle})`, totalPaid],
+      [`Not Paid (${rangeTitle})`, totalPending],
+      [],
+      ['Month', 'Year', 'Site No', 'Member', 'Amount Due', 'Amount Paid', 'Paid Date', 'Mode', 'Reference', 'Status'],
+      ...payments.map((p) => [
+        Util.monthName(p._month),
+        p._year,
+        p.site_no || '',
+        p.member_name,
+        p.amount_due,
+        p.amount_paid,
+        p.paid_date || '',
+        p.payment_mode || '',
+        p.reference_no || '',
+        p.status,
+      ]),
+    ];
+    Util.downloadCsv(`maintenance-dues-${this.getRangeLabel(startDate, endDate)}.csv`, rows);
+  },
+
+  async exportPdfForRange(pairs, startDate, endDate) {
+    const payments = await this.fetchPaymentsForRange(pairs);
+    const { totalPaid, totalPending } = this.computeRangeTotals(payments);
+    const rangeTitle = this.getRangeTitle(startDate, endDate);
+    const summary = [
+      [`Paid (${rangeTitle})`, Util.moneyPlain(totalPaid)],
+      [`Not Paid (${rangeTitle})`, Util.moneyPlain(totalPending)],
+    ];
+    const columns = ['Month', 'Site No', 'Member', 'Amount Due', 'Amount Paid', 'Paid Date', 'Mode', 'Reference', 'Status'];
     const rows = payments.map((p) => [
+      `${Util.monthName(p._month)} ${p._year}`,
       p.site_no || '-',
       p.member_name,
       Util.moneyPlain(p.amount_due),
@@ -179,12 +262,100 @@ window.MaintenancePage = {
       p.reference_no || '-',
       p.status,
     ]);
-    Util.downloadPdf(
-      `maintenance-dues-${Util.monthName(this.state.month)}-${this.state.year}.pdf`,
-      `Maintenance Dues - ${Util.monthName(this.state.month)} ${this.state.year}`,
-      columns,
-      rows
-    );
+    Util.downloadPdf(`maintenance-dues-${this.getRangeLabel(startDate, endDate)}.pdf`, `Maintenance Dues - ${rangeTitle}`, columns, rows, { summary });
+  },
+
+  showExportModal(format) {
+    const thisYear = new Date().getFullYear();
+    const years = [thisYear, thisYear - 1, thisYear - 2];
+    const yearOptions = years.map((y) => `<option value="${y}" ${y === this.state.year ? 'selected' : ''}>${y}</option>`).join('');
+    const label = format === 'csv' ? 'CSV' : 'PDF';
+    const defaultFrom = Util.todayISO();
+    const defaultTo = Util.todayISO();
+
+    Util.openModal(`
+      <h3>Export ${label}</h3>
+      <form id="exportRangeForm" style="text-align:left;">
+        <div class="field"><label>Option</label>
+          <select id="er_option">
+            <option value="custom" selected>Custom Range</option>
+            <option value="full">Full Year</option>
+          </select>
+        </div>
+        <div class="field"><label>Year</label><select id="er_year">${yearOptions}</select></div>
+        <div id="er_customFields" class="form-grid">
+          <div class="field"><label>From Date</label><input type="date" id="er_fromDate" value="${defaultFrom}" /></div>
+          <div class="field"><label>To Date</label><input type="date" id="er_toDate" value="${defaultTo}" /></div>
+        </div>
+        <div class="toolbar close-modal mt-16" style="justify-content:center;">
+          <button type="submit">Export ${label}</button>
+          <button type="button" class="secondary" id="closeExportRangeModalBtn">Cancel</button>
+        </div>
+      </form>
+    `);
+
+    const optionSelect = document.getElementById('er_option');
+    const yearSelect = document.getElementById('er_year');
+    const customFields = document.getElementById('er_customFields');
+    const fromDateInput = document.getElementById('er_fromDate');
+    const toDateInput = document.getElementById('er_toDate');
+
+    const syncVisibility = () => {
+      customFields.style.display = optionSelect.value === 'custom' ? '' : 'none';
+    };
+    syncVisibility();
+
+    optionSelect.addEventListener('change', syncVisibility);
+    yearSelect.addEventListener('change', (e) => {
+      if (optionSelect.value !== 'custom') return;
+      fromDateInput.value = `${e.target.value}-01-01`;
+      toDateInput.value = `${e.target.value}-12-31`;
+    });
+
+    document.getElementById('closeExportRangeModalBtn').addEventListener('click', () => Util.closeModal());
+
+    document.getElementById('exportRangeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const year = Number(yearSelect.value);
+      let pairs;
+      let startDate;
+      let endDate;
+      if (optionSelect.value === 'full') {
+        pairs = this.getMonthYearRange(1, year, 12, year);
+        startDate = `${year}-01-01`;
+        endDate = `${year}-12-31`;
+      } else {
+        const fromDate = fromDateInput.value;
+        const toDate = toDateInput.value;
+        if (!fromDate || !toDate) {
+          this.showAlert('Select both a From date and a To date.');
+          return;
+        }
+        if (fromDate > toDate) {
+          this.showAlert('From date must not be after To date.');
+          return;
+        }
+        pairs = this.getMonthYearRange(
+          Number(fromDate.slice(5, 7)),
+          Number(fromDate.slice(0, 4)),
+          Number(toDate.slice(5, 7)),
+          Number(toDate.slice(0, 4))
+        );
+        startDate = fromDate;
+        endDate = toDate;
+      }
+      const submitBtn = e.target.querySelector('button[type=submit]');
+      submitBtn.disabled = true;
+      try {
+        if (format === 'csv') await this.exportCsvForRange(pairs, startDate, endDate);
+        else await this.exportPdfForRange(pairs, startDate, endDate);
+        Util.closeModal();
+      } catch (err) {
+        this.showAlert(err.message);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
   },
 
   renderRows() {

@@ -1,5 +1,5 @@
 window.ReportsPage = {
-  state: { fy: null },
+  state: { mode: 'fy', fy: null, from: null, to: null },
   summary: null,
 
   // Indian FY runs April-March; if we're before April, the current FY started last calendar year
@@ -22,12 +22,29 @@ window.ReportsPage = {
 
       <div class="panel">
         <div class="panel-header">
-          <h3>Financial Year</h3>
+          <h3>Period</h3>
           <div class="toolbar">
-            <select id="fySelect">${fyOptions.map((fy) => `<option value="${fy}" ${fy === this.state.fy ? 'selected' : ''}>FY ${fy}</option>`).join('')}</select>
             <button type="button" class="secondary" id="exportCsvBtn">Export CSV</button>
             <button type="button" class="secondary" id="exportPdfBtn">Export PDF</button>
           </div>
+        </div>
+        <div class="toolbar" style="margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:normal;">
+            <input type="radio" name="itrMode" id="itrModeFy" value="fy" ${this.state.mode === 'fy' ? 'checked' : ''} /> Financial Year
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:normal;">
+            <input type="radio" name="itrMode" id="itrModeCustom" value="custom" ${this.state.mode === 'custom' ? 'checked' : ''} /> Custom Date Range
+          </label>
+        </div>
+        <div class="form-grid" id="fyModeControls" style="${this.state.mode === 'fy' ? '' : 'display:none;'}">
+          <div class="field"><label>Financial Year</label>
+            <select id="fySelect">${fyOptions.map((fy) => `<option value="${fy}" ${fy === this.state.fy ? 'selected' : ''}>FY ${fy}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="form-grid" id="customModeControls" style="${this.state.mode === 'custom' ? '' : 'display:none;'}">
+          <div class="field"><label>From Date</label><input type="date" id="fromDate" value="${this.state.from || ''}" /></div>
+          <div class="field"><label>To Date</label><input type="date" id="toDate" value="${this.state.to || ''}" /></div>
+          <div class="field" style="align-self:flex-end;"><button type="button" id="applyRangeBtn">Apply</button></div>
         </div>
         <div id="summaryBox">Loading…</div>
       </div>
@@ -37,10 +54,36 @@ window.ReportsPage = {
       this.state.fy = e.target.value;
       this.load();
     });
+    document.getElementById('itrModeFy').addEventListener('change', () => this.setMode('fy'));
+    document.getElementById('itrModeCustom').addEventListener('change', () => this.setMode('custom'));
+    document.getElementById('applyRangeBtn').addEventListener('click', () => {
+      this.state.from = document.getElementById('fromDate').value;
+      this.state.to = document.getElementById('toDate').value;
+      if (!this.state.from || !this.state.to) {
+        this.showAlert('Select both a From date and a To date.');
+        return;
+      }
+      if (this.state.from > this.state.to) {
+        this.showAlert('From date must not be after To date.');
+        return;
+      }
+      this.load();
+    });
     document.getElementById('exportCsvBtn').addEventListener('click', () => this.exportCsv());
     document.getElementById('exportPdfBtn').addEventListener('click', () => this.exportPdf());
 
     await this.load();
+  },
+
+  setMode(mode) {
+    this.state.mode = mode;
+    document.getElementById('fyModeControls').style.display = mode === 'fy' ? '' : 'none';
+    document.getElementById('customModeControls').style.display = mode === 'custom' ? '' : 'none';
+    if (mode === 'fy') {
+      this.load();
+    } else if (this.state.from && this.state.to) {
+      this.load();
+    }
   },
 
   showAlert(message, type = 'error') {
@@ -50,7 +93,11 @@ window.ReportsPage = {
 
   async load() {
     try {
-      this.summary = await Api.get(`/reports/itr-summary?fy=${this.state.fy}`);
+      const query =
+        this.state.mode === 'custom' && this.state.from && this.state.to
+          ? `from=${this.state.from}&to=${this.state.to}`
+          : `fy=${this.state.fy}`;
+      this.summary = await Api.get(`/reports/itr-summary?${query}`);
       this.renderSummary();
     } catch (err) {
       this.showAlert(err.message);
@@ -66,7 +113,7 @@ window.ReportsPage = {
       <div class="mb-16">
         <strong>${Util.escapeHtml(assoc.app_name || 'Association')}</strong><br/>
         <span class="text-muted">${Util.escapeHtml(assoc.office_address || '')}</span><br/>
-        <span class="text-muted">Period: ${Util.formatDate(s.dateRange.start)} – ${Util.formatDate(s.dateRange.end)} (FY ${s.fy})</span>
+        <span class="text-muted">Period: ${Util.formatDate(s.dateRange.start)} – ${Util.formatDate(s.dateRange.end)}${s.fy ? ` (FY ${s.fy})` : ''}</span>
       </div>
 
       <h4 style="color: green;">Income</h4>
@@ -93,12 +140,16 @@ window.ReportsPage = {
       <h4 style="color: #e30bb9;">Net ${s.net >= 0 ? 'Surplus' : 'Deficit'} :  ${Util.money(Math.abs(s.net))}</h4>`;
   },
 
+  getReportLabel(s) {
+    return s.fy ? `fy-${s.fy}` : `${s.dateRange.start}_to_${s.dateRange.end}`;
+  },
+
   exportCsv() {
     const s = this.summary;
     if (!s) return;
     const rows = [
       [`${s.association.app_name || 'Association'} - Income & Expense Summary`],
-      [`Financial Year: ${s.fy} (${s.dateRange.start} to ${s.dateRange.end})`],
+      [s.fy ? `Financial Year: ${s.fy} (${s.dateRange.start} to ${s.dateRange.end})` : `Period: ${s.dateRange.start} to ${s.dateRange.end}`],
       [],
       ['Income'],
       ['Maintenance dues collected', s.income.maintenance],
@@ -123,7 +174,7 @@ window.ReportsPage = {
       ['Title', 'Category', 'Amount', 'Date', 'Source', 'Notes'],
       ...s.details.expenses.map((e) => [e.title, e.category || '', e.amount, e.expense_date, e.source, e.notes || '']),
     ];
-    Util.downloadCsv(`itr-summary-fy-${s.fy}.csv`, rows);
+    Util.downloadCsv(`itr-summary-${this.getReportLabel(s)}.csv`, rows);
   },
 
   exportPdf() {
@@ -138,9 +189,10 @@ window.ReportsPage = {
       ['Total Expenses', Util.moneyPlain(s.expenses.total)],
       [s.net >= 0 ? 'Net Surplus' : 'Net Deficit', Util.moneyPlain(Math.abs(s.net))],
     ];
+    const periodLabel = s.fy ? `FY ${s.fy}` : `${Util.formatDate(s.dateRange.start)} – ${Util.formatDate(s.dateRange.end)}`;
     Util.downloadPdf(
-      `itr-summary-fy-${s.fy}.pdf`,
-      `${s.association.app_name || 'Association'} - Income & Expense Summary (FY ${s.fy})`,
+      `itr-summary-${this.getReportLabel(s)}.pdf`,
+      `${s.association.app_name || 'Association'} - Income & Expense Summary (${periodLabel})`,
       columns,
       rows
     );

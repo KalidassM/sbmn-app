@@ -88,15 +88,28 @@ const Util = {
   },
   // Builds a simple titled table PDF via jsPDF + autoTable (loaded from CDN in portal.html) and
   // triggers a download. `columns` is an array of header labels, `rows` an array of arrays.
-  downloadPdf(filename, title, columns, rows) {
+  // `options.summary`, if given, is an array of [label, value] pairs rendered as a borderless
+  // key/value block above the main table (e.g. the same stat-card totals shown on screen).
+  downloadPdf(filename, title, columns, rows, options = {}) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text(title, 14, 15);
+    let startY = 20;
+    if (options.summary && options.summary.length) {
+      doc.autoTable({
+        body: options.summary,
+        startY,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: { top: 1.5, bottom: 1.5, left: 0, right: 4 } },
+        columnStyles: { 0: { fontStyle: 'normal', textColor: [90, 90, 90] }, 1: { fontStyle: 'bold', textColor: [47, 111, 78] } },
+      });
+      startY = doc.lastAutoTable.finalY + 6;
+    }
     doc.autoTable({
       head: [columns],
       body: rows,
-      startY: 20,
+      startY,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [47, 111, 78] },
     });

@@ -13,8 +13,23 @@ function fyRange(fy) {
 }
 
 router.get('/itr-summary', requireAuth, requireAdmin, (req, res) => {
-  const range = fyRange(req.query.fy);
-  if (!range) return res.status(400).json({ error: 'fy must be in YYYY-YY format, e.g. 2025-26' });
+  const { fy, from, to } = req.query;
+  let range;
+  let fyLabel = null;
+
+  if (from || to) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from || '') || !/^\d{4}-\d{2}-\d{2}$/.test(to || '')) {
+      return res.status(400).json({ error: 'from/to must both be provided in YYYY-MM-DD format' });
+    }
+    if (from > to) {
+      return res.status(400).json({ error: 'From date must not be after To date' });
+    }
+    range = { start: from, end: to };
+  } else {
+    range = fyRange(fy);
+    if (!range) return res.status(400).json({ error: 'fy must be in YYYY-YY format, e.g. 2025-26, or provide from/to dates' });
+    fyLabel = fy;
+  }
   const { start, end } = range;
 
   // Cash basis: dues counted when actually paid (paid_date), not the due period they were billed for
@@ -64,7 +79,7 @@ router.get('/itr-summary', requireAuth, requireAdmin, (req, res) => {
   const incomeTotal = maintenanceTotal + donationsTotal;
 
   res.json({
-    fy: req.query.fy,
+    fy: fyLabel,
     dateRange: { start, end },
     association: association || {},
     income: { maintenance: maintenanceTotal, donations: donationsTotal, total: incomeTotal },
