@@ -143,6 +143,24 @@ async function sendMessage(phone, text) {
   }
 }
 
+// Groups the linked admin account participates in - used to let the admin pick a specific
+// WhatsApp group to message from the portal, rather than only individual members.
+async function listGroups() {
+  if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
+  const groups = await sock.groupFetchAllParticipating();
+  return Object.values(groups)
+    .map((g) => ({ id: g.id, name: g.subject }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// groupId is a full "...@g.us" JID, as returned by listGroups() - unlike sendMessage() this
+// doesn't go through toWhatsAppJids() since a group JID isn't a phone number.
+async function sendToGroup(groupId, text) {
+  if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
+  if (!groupId) throw new Error('No group selected');
+  await sock.sendMessage(groupId, { text });
+}
+
 function logout() {
   if (sock) {
     // sock.logout() is async - a broken/already-invalid connection rejects the returned promise
@@ -158,4 +176,4 @@ function logout() {
   clearTimeout(reconnectTimer);
 }
 
-module.exports = { connect, getStatus, getQrDataUrl, isConnected, sendMessage, logout };
+module.exports = { connect, getStatus, getQrDataUrl, isConnected, sendMessage, listGroups, sendToGroup, logout };
