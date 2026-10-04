@@ -20,7 +20,7 @@ window.SendWhatsappPage = {
             <label>Group</label>
             <select id="groupSelect"><option value="">Loading groups…</option></select>
           </div>
-          <div class="field" id="memberField" style="display:none;">
+          <div class="field" id="memberField" style="display:none;"> 
             <label>Member</label>
             <select id="memberSelect"><option value="">Loading members…</option></select>
           </div>
