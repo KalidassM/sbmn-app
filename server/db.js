@@ -197,6 +197,9 @@ if (!generalSettingsColumns.includes('reminder_days')) {
 if (!generalSettingsColumns.includes('reminder_time')) {
   db.exec("ALTER TABLE general_settings ADD COLUMN reminder_time TEXT NOT NULL DEFAULT '10:00'");
 }
+if (!generalSettingsColumns.includes('reminder_enabled')) {
+  db.exec('ALTER TABLE general_settings ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 1');
+}
 
 // Migration: add site_no to members if the table pre-dates this column
 const memberColumns = db.prepare('PRAGMA table_info(members)').all().map((c) => c.name);

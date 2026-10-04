@@ -29,6 +29,7 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
     resend_from_email,
     reminder_days,
     reminder_time,
+    reminder_enabled,
   } = req.body || {};
   const existing = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
 
@@ -58,11 +59,13 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
     finalReminderTime = reminder_time;
   }
 
+  const finalReminderEnabled = reminder_enabled !== undefined ? (reminder_enabled ? 1 : 0) : existing.reminder_enabled;
+
   db.prepare(
     `UPDATE general_settings SET
        maintenance_amount = ?,
        app_name = ?, contact_email = ?, office_address = ?, office_hours = ?, phone_number = ?,
-       resend_api_key = ?, resend_from_email = ?, reminder_days = ?, reminder_time = ?,
+       resend_api_key = ?, resend_from_email = ?, reminder_days = ?, reminder_time = ?, reminder_enabled = ?,
        updated_at = datetime('now')
      WHERE id = 1`
   ).run(
@@ -76,7 +79,8 @@ router.put('/', requireAuth, requireSuperAdmin, (req, res) => {
     resend_api_key ? resend_api_key : existing.resend_api_key,
     resend_from_email !== undefined ? resend_from_email || null : existing.resend_from_email,
     finalReminderDays,
-    finalReminderTime
+    finalReminderTime,
+    finalReminderEnabled
   );
   const row = db.prepare('SELECT * FROM general_settings WHERE id = 1').get();
   logActivity({

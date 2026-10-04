@@ -31,7 +31,14 @@ window.GeneralSettingsPage = {
 
       <form id="reminderForm">
         <div class="panel">
-          <div class="panel-header"><h3>Reminder Schedule</h3></div>
+          <div class="panel-header"><h3>Reminder Schedule <span id="reminderBadge"></span></h3></div>
+          <div class="field">
+            <label class="toggle-switch">
+              <input type="checkbox" id="reminderEnabled" />
+              <span class="toggle-track"></span>
+              Active (send automatic WhatsApp reminders)
+            </label>
+          </div>
           <div class="field"><label>Days of the month to send WhatsApp reminders on</label>
             <div id="reminderDaysGrid" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;max-width:420px;">
               ${Array.from({ length: 31 }, (_, i) => i + 1)
@@ -88,6 +95,11 @@ window.GeneralSettingsPage = {
     document.querySelectorAll('.reminderDay').forEach((cb) => {
       cb.checked = selectedDays.has(cb.value);
     });
+    const reminderEnabled = settings.reminder_enabled === undefined ? true : !!settings.reminder_enabled;
+    document.getElementById('reminderEnabled').checked = reminderEnabled;
+    document.getElementById('reminderBadge').innerHTML = reminderEnabled
+      ? '<span class="badge active">active</span>'
+      : '<span class="badge unpaid">inactive</span>';
 
     const saveSection = async (payload) => {
       try {
@@ -125,6 +137,7 @@ window.GeneralSettingsPage = {
       saveSection({
         reminder_days: reminderDays.join(','),
         reminder_time: document.getElementById('reminderTime').value,
+        reminder_enabled: document.getElementById('reminderEnabled').checked,
       });
     });
 
