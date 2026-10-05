@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { notifyExpenseAdded } = require('../utils/expenseNotify');
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     entityId: expense.id,
     description: `Added expense "${expense.title}" of ₹${expense.amount}`,
   });
+  notifyExpenseAdded(expense);
   res.status(201).json(expense);
 });
 
