@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
 const { buildUpiQr } = require('../utils/upiQr');
-const { logActivity } = require('../utils/activityLog');
+const { logActivity } = require('../utils/activityLog'); 
 
 const router = express.Router();
 

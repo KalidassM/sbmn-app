@@ -6,13 +6,6 @@ const db = require('../db');
 
 const router = express.Router();
 
-// The Reminder Schedule "Active" toggle in General Settings is a global kill switch for all
-// outbound WhatsApp sends from the admin UI, not just the automated monthly-dues reminders.
-function remindersEnabled() {
-  const row = db.prepare('SELECT reminder_enabled FROM general_settings WHERE id = 1').get();
-  return !!row?.reminder_enabled;
-}
-
 // Polled by the General Settings page while the admin links their WhatsApp account - returns a QR
 // code to scan (Linked Devices) until status flips to 'connected'.
 router.get('/status', requireAuth, requireAdmin, async (req, res) => {
@@ -31,9 +24,6 @@ router.post('/logout', requireAuth, requireAdmin, (req, res) => {
 // Sends a single one-off message to a phone number of the admin's choosing - lets them confirm
 // delivery actually works before the automatic monthly-dues reminder ever touches real members.
 router.post('/test', requireAuth, requireAdmin, async (req, res) => {
-  if (!remindersEnabled()) {
-    return res.status(400).json({ error: 'Reminder Schedule is set to Inactive in General Settings - turn it on to send WhatsApp messages' });
-  }
   const phone = (req.body?.phone || '').trim();
   if (!phone) return res.status(400).json({ error: 'Enter a phone number' });
   try {
@@ -57,9 +47,6 @@ router.get('/groups', requireAuth, requireAdmin, async (req, res) => {
 // Sends an ad-hoc message to either a specific WhatsApp group or a specific member, from the
 // Send WhatsApp Message admin page - distinct from the automated monthly-dues reminders.
 router.post('/send', requireAuth, requireAdmin, async (req, res) => {
-  if (!remindersEnabled()) {
-    return res.status(400).json({ error: 'Reminder Schedule is set to Inactive in General Settings - turn it on to send WhatsApp messages' });
-  }
   const { target, groupId, memberId, text } = req.body || {};
   const message = (text || '').trim();
   if (!message) return res.status(400).json({ error: 'Enter a message' });
