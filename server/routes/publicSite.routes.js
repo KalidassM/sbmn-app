@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { notifyAdminOfContactMessage } = require('../utils/contactNotify');
 
 const router = express.Router();
 
@@ -51,15 +52,12 @@ router.post('/contact-messages', (req, res) => {
   if (!cleanName || !cleanPhone || !cleanMessage) {
     return res.status(400).json({ error: 'Name, phone and message are required' });
   }
+  const cleanHouseNo = (house_no || '').toString().trim().slice(0, 40) || null;
+  const cleanEmail = (email || '').toString().trim().slice(0, 160) || null;
   db.prepare(
     'INSERT INTO contact_messages (name, house_no, phone, email, message) VALUES (?, ?, ?, ?, ?)'
-  ).run(
-    cleanName.slice(0, 120),
-    (house_no || '').toString().trim().slice(0, 40) || null,
-    cleanPhone.slice(0, 32),
-    (email || '').toString().trim().slice(0, 160) || null,
-    cleanMessage.slice(0, 1000)
-  );
+  ).run(cleanName.slice(0, 120), cleanHouseNo, cleanPhone.slice(0, 32), cleanEmail, cleanMessage.slice(0, 1000));
+  notifyAdminOfContactMessage({ name: cleanName, house_no: cleanHouseNo, phone: cleanPhone, email: cleanEmail, message: cleanMessage });
   res.status(201).json({ ok: true });
 });
 
