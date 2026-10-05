@@ -32,8 +32,8 @@ async function sendDailyReminders({ force = false } = {}) {
     .prepare('SELECT reminders_last_sent_date, app_name, reminder_days, reminder_time, reminder_enabled FROM general_settings WHERE id = 1')
     .get();
 
-  if (!force && !settings?.reminder_enabled) {
-    return { skipped: true, reason: 'Automatic reminders are turned off in General Settings.' };
+  if (!settings?.reminder_enabled) {
+    return { skipped: true, reason: 'Reminder Schedule is set to Inactive in General Settings.' };
   }
 
   const reminderDays = (settings?.reminder_days || DEFAULT_REMINDER_DAYS)

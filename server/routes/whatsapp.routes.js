@@ -6,12 +6,9 @@ const db = require('../db');
 
 const router = express.Router();
 
-// The Reminder Schedule "Active" toggle in General Settings is a global kill switch for all
-// outbound WhatsApp sends from the admin UI, not just the automated monthly-dues reminders.
-function remindersEnabled() {
-  const row = db.prepare('SELECT reminder_enabled FROM general_settings WHERE id = 1').get();
-  return !!row?.reminder_enabled;
-}
+// whatsapp.sendMessage/sendToGroup already enforce the Reminder Schedule "Active" toggle, but these
+// two routes check it upfront too so the admin gets a clear 400 before any other validation runs.
+const { remindersEnabled } = whatsapp;
 
 // Polled by the General Settings page while the admin links their WhatsApp account - returns a QR
 // code to scan (Linked Devices) until status flips to 'connected'.

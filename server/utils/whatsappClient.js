@@ -118,6 +118,16 @@ function isConnected() {
   return status === 'connected';
 }
 
+// The Reminder Schedule "Active" toggle in General Settings is a global kill switch for every
+// outbound WhatsApp send this app makes - automated dues reminders, member welcome/status-change
+// messages, payment/donation confirmations, password-reset codes, ad-hoc admin sends, and the
+// internal Laravel bridge - not just the automated monthly-dues reminders. Enforced here, in
+// sendMessage/sendToGroup, so no call site can accidentally bypass it.
+function remindersEnabled() {
+  const row = db.prepare('SELECT reminder_enabled FROM general_settings WHERE id = 1').get();
+  return !!row?.reminder_enabled;
+}
+
 function toWhatsAppJids(phone) {
   if (!phone) return [];
   // Some members have more than one number on file (e.g. "9688502997 / 8072006482") -
@@ -135,6 +145,7 @@ function toWhatsAppJids(phone) {
 }
 
 async function sendMessage(phone, text) {
+  if (!remindersEnabled()) throw new Error('Reminder Schedule is set to Inactive in General Settings - turn it on to send WhatsApp messages');
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   const jids = toWhatsAppJids(phone);
   if (!jids.length) throw new Error('No valid phone number on file');
@@ -156,6 +167,7 @@ async function listGroups() {
 // groupId is a full "...@g.us" JID, as returned by listGroups() - unlike sendMessage() this
 // doesn't go through toWhatsAppJids() since a group JID isn't a phone number.
 async function sendToGroup(groupId, text) {
+  if (!remindersEnabled()) throw new Error('Reminder Schedule is set to Inactive in General Settings - turn it on to send WhatsApp messages');
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   if (!groupId) throw new Error('No group selected');
   await sock.sendMessage(groupId, { text });
@@ -176,4 +188,4 @@ function logout() {
   clearTimeout(reconnectTimer);
 }
 
-module.exports = { connect, getStatus, getQrDataUrl, isConnected, sendMessage, listGroups, sendToGroup, logout };
+module.exports = { connect, getStatus, getQrDataUrl, isConnected, remindersEnabled, sendMessage, listGroups, sendToGroup, logout };
