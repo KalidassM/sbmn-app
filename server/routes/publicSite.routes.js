@@ -46,7 +46,7 @@ router.get('/committee', (req, res) => {
 
 router.get('/worker-contacts', (req, res) => {
   const rows = db
-    .prepare('SELECT id, name, mobile, mobile2, profession FROM worker_contacts ORDER BY profession COLLATE NOCASE, name COLLATE NOCASE')
+    .prepare('SELECT id, name, mobile, mobile2, profession, title FROM worker_contacts ORDER BY profession COLLATE NOCASE, name COLLATE NOCASE')
     .all();
   res.json(rows);
 });

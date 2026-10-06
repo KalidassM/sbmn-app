@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS worker_contacts (
   mobile TEXT NOT NULL,
   mobile2 TEXT,
   profession TEXT NOT NULL,
+  title TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -166,6 +167,9 @@ db.prepare('INSERT OR IGNORE INTO general_settings (id) VALUES (1)').run();
 const workerContactColumns = db.prepare('PRAGMA table_info(worker_contacts)').all().map((c) => c.name);
 if (!workerContactColumns.includes('mobile2')) {
   db.exec('ALTER TABLE worker_contacts ADD COLUMN mobile2 TEXT');
+}
+if (!workerContactColumns.includes('title')) {
+  db.exec('ALTER TABLE worker_contacts ADD COLUMN title TEXT');
 }
 
 const generalSettingsColumns = db.prepare('PRAGMA table_info(general_settings)').all().map((c) => c.name);

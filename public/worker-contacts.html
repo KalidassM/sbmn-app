@@ -48,6 +48,7 @@
   .avatar{flex:0 0 46px; height:46px; border-radius:50%; background:var(--green); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;}
   .info{flex:1; min-width:0;}
   .info h3{font-size:1rem; overflow-wrap:anywhere;}
+  .info .title{color:var(--green); font-size:0.85rem; font-weight:600;}
   .info .mobile{color:var(--muted); font-size:0.88rem;}
   .calls{flex:0 0 auto; display:flex; flex-direction:column; gap:6px; align-items:stretch; text-align:center;}
   .call{flex:0 0 auto; background:var(--vermilion); color:#fff; text-decoration:none; font-size:0.85rem; font-weight:600; padding:8px 14px; border-radius:999px;}
@@ -79,7 +80,7 @@
     </div>
 
     <div class="tools">
-      <input type="search" class="search" id="search" placeholder="Search by name, profession or number" aria-label="Search contacts" />
+      <input type="search" class="search" id="search" placeholder="Search by name, category or number" aria-label="Search contacts" />
       <div class="chips" id="chips"></div>
     </div>
 
@@ -110,7 +111,7 @@
       const visible = workers.filter(
         (w) =>
           (!activeProfession || w.profession === activeProfession) &&
-          (!q || `${w.name} ${w.profession} ${w.mobile} ${w.mobile2 || ''}`.toLowerCase().includes(q))
+          (!q || `${w.name} ${w.profession} ${w.title || ''} ${w.mobile} ${w.mobile2 || ''}`.toLowerCase().includes(q))
       );
       if (!visible.length) {
         list.innerHTML = `<p class="empty">${workers.length ? 'No contacts match your search.' : 'No contacts listed yet.'}</p>`;
@@ -129,7 +130,7 @@
                 (w) => `
               <div class="card">
                 <div class="avatar">${esc(w.name.trim().charAt(0).toUpperCase())}</div>
-                <div class="info"><h3>${esc(w.name)}</h3><div class="mobile">${esc(w.mobile)}</div>${w.mobile2 ? `<div class="mobile">${esc(w.mobile2)}</div>` : ''}</div>
+                <div class="info"><h3>${esc(w.name)}</h3>${w.title ? `<div class="title">${esc(w.title)}</div>` : ''}<div class="mobile">${esc(w.mobile)}</div>${w.mobile2 ? `<div class="mobile">${esc(w.mobile2)}</div>` : ''}</div>
                 <div class="calls"><a class="call" href="tel:${esc(w.mobile)}">Call</a>${w.mobile2 ? `<a class="call alt" href="tel:${esc(w.mobile2)}">Call 2nd</a>` : ''}</div>
               </div>`
               )

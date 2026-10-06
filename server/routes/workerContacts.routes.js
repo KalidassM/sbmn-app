@@ -6,12 +6,13 @@ const { logActivity } = require('../utils/activityLog');
 const router = express.Router();
 
 function clean(body) {
-  const { name, mobile, mobile2, profession } = body || {};
+  const { name, mobile, mobile2, profession, title } = body || {};
   return {
     name: (name || '').toString().trim().slice(0, 80),
     mobile: (mobile || '').toString().trim().slice(0, 20),
     mobile2: (mobile2 || '').toString().trim().slice(0, 20) || null,
     profession: (profession || '').toString().trim().slice(0, 60),
+    title: (title || '').toString().trim().slice(0, 80) || null,
   };
 }
 
@@ -23,13 +24,13 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
-  const { name, mobile, mobile2, profession } = clean(req.body);
+  const { name, mobile, mobile2, profession, title } = clean(req.body);
   if (!name || !mobile || !profession) {
     return res.status(400).json({ error: 'name, mobile and profession are required' });
   }
   const info = db
-    .prepare('INSERT INTO worker_contacts (name, mobile, mobile2, profession) VALUES (?, ?, ?, ?)')
-    .run(name, mobile, mobile2, profession);
+    .prepare('INSERT INTO worker_contacts (name, mobile, mobile2, profession, title) VALUES (?, ?, ?, ?, ?)')
+    .run(name, mobile, mobile2, profession, title);
   const row = db.prepare('SELECT * FROM worker_contacts WHERE id = ?').get(info.lastInsertRowid);
   logActivity({
     actor: req.user?.username,
@@ -44,15 +45,16 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM worker_contacts WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Worker contact not found' });
-  const { name, mobile, mobile2, profession } = clean(req.body);
+  const { name, mobile, mobile2, profession, title } = clean(req.body);
   if (!name || !mobile || !profession) {
     return res.status(400).json({ error: 'name, mobile and profession are required' });
   }
-  db.prepare('UPDATE worker_contacts SET name = ?, mobile = ?, mobile2 = ?, profession = ? WHERE id = ?').run(
+  db.prepare('UPDATE worker_contacts SET name = ?, mobile = ?, mobile2 = ?, profession = ?, title = ? WHERE id = ?').run(
     name,
     mobile,
     mobile2,
     profession,
+    title,
     req.params.id
   );
   const row = db.prepare('SELECT * FROM worker_contacts WHERE id = ?').get(req.params.id);
