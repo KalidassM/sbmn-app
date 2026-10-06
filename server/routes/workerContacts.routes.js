@@ -2,16 +2,17 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { joinCategories, withCategories } = require('../utils/workerCategories');
 
 const router = express.Router();
 
 function clean(body) {
-  const { name, mobile, mobile2, profession, title } = body || {};
+  const { name, mobile, mobile2, categories, profession, title } = body || {};
   return {
     name: (name || '').toString().trim().slice(0, 80),
     mobile: (mobile || '').toString().trim().slice(0, 20),
     mobile2: (mobile2 || '').toString().trim().slice(0, 20) || null,
-    profession: (profession || '').toString().trim().slice(0, 60),
+    profession: joinCategories(Array.isArray(categories) ? categories : [profession]),
     title: (title || '').toString().trim().slice(0, 80) || null,
   };
 }
@@ -20,13 +21,13 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   const rows = db
     .prepare('SELECT * FROM worker_contacts ORDER BY profession COLLATE NOCASE, name COLLATE NOCASE')
     .all();
-  res.json(rows);
+  res.json(rows.map(withCategories));
 });
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   const { name, mobile, mobile2, profession, title } = clean(req.body);
   if (!name || !mobile || !profession) {
-    return res.status(400).json({ error: 'name, mobile and profession are required' });
+    return res.status(400).json({ error: 'name, mobile and at least one category are required' });
   }
   const info = db
     .prepare('INSERT INTO worker_contacts (name, mobile, mobile2, profession, title) VALUES (?, ?, ?, ?, ?)')
@@ -37,9 +38,9 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     action: 'create',
     entityType: 'worker_contact',
     entityId: row.id,
-    description: `Added worker contact ${row.name} (${row.profession})`,
+    description: `Added worker contact ${row.name} (${row.profession.split(',').join(', ')})`,
   });
-  res.status(201).json(row);
+  res.status(201).json(withCategories(row));
 });
 
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
@@ -47,7 +48,7 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Worker contact not found' });
   const { name, mobile, mobile2, profession, title } = clean(req.body);
   if (!name || !mobile || !profession) {
-    return res.status(400).json({ error: 'name, mobile and profession are required' });
+    return res.status(400).json({ error: 'name, mobile and at least one category are required' });
   }
   db.prepare('UPDATE worker_contacts SET name = ?, mobile = ?, mobile2 = ?, profession = ?, title = ? WHERE id = ?').run(
     name,
@@ -63,9 +64,9 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     action: 'update',
     entityType: 'worker_contact',
     entityId: row.id,
-    description: `Updated worker contact ${row.name} (${row.profession})`,
+    description: `Updated worker contact ${row.name} (${row.profession.split(',').join(', ')})`,
   });
-  res.json(row);
+  res.json(withCategories(row));
 });
 
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {

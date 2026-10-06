@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { withCategories } = require('../utils/workerCategories');
 const { notifyAdminOfContactMessage } = require('../utils/contactNotify');
 
 const router = express.Router();
@@ -48,7 +49,7 @@ router.get('/worker-contacts', (req, res) => {
   const rows = db
     .prepare('SELECT id, name, mobile, mobile2, profession, title FROM worker_contacts ORDER BY profession COLLATE NOCASE, name COLLATE NOCASE')
     .all();
-  res.json(rows);
+  res.json(rows.map(withCategories));
 });
 
 router.post('/contact-messages', (req, res) => {

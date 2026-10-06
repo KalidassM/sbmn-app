@@ -262,6 +262,10 @@ input, select, textarea {
   color: var(--text);
 }
 
+input[type="checkbox"] {
+  width: auto;
+}
+
 label {
   display: block;
   font-size: 0.8rem;

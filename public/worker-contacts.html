@@ -100,7 +100,7 @@
     let activeProfession = '';
 
     function renderChips() {
-      const professions = [...new Set(workers.map((w) => w.profession))];
+      const professions = [...new Set(workers.flatMap((w) => w.categories))].sort();
       chips.innerHTML = [''].concat(professions)
         .map((p) => `<button type="button" class="chip${p === activeProfession ? ' active' : ''}" data-p="${esc(p)}">${p ? esc(p) : 'All'}</button>`)
         .join('');
@@ -110,16 +110,21 @@
       const q = searchEl.value.trim().toLowerCase();
       const visible = workers.filter(
         (w) =>
-          (!activeProfession || w.profession === activeProfession) &&
-          (!q || `${w.name} ${w.profession} ${w.title || ''} ${w.mobile} ${w.mobile2 || ''}`.toLowerCase().includes(q))
+          (!activeProfession || w.categories.includes(activeProfession)) &&
+          (!q || `${w.name} ${w.categories.join(' ')} ${w.title || ''} ${w.mobile} ${w.mobile2 || ''}`.toLowerCase().includes(q))
       );
       if (!visible.length) {
         list.innerHTML = `<p class="empty">${workers.length ? 'No contacts match your search.' : 'No contacts listed yet.'}</p>`;
         return;
       }
       const groups = {};
-      visible.forEach((w) => (groups[w.profession] = groups[w.profession] || []).push(w));
-      list.innerHTML = Object.keys(groups)
+      visible.forEach((w) =>
+        w.categories.forEach((c) => {
+          if (activeProfession && c !== activeProfession) return;
+          (groups[c] = groups[c] || []).push(w);
+        })
+      );
+      list.innerHTML = Object.keys(groups).sort()
         .map(
           (p) => `
         <section class="group">

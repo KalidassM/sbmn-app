@@ -1,13 +1,16 @@
 const WORKER_CATEGORIES = [
+  'Panjayath Office',
+  'EB Office',
+  'Sweeper',
+  'Waterman',
   'Electrician',
   'Plumber',
   'Carpenter',
   'Painter',
   'Mason',
-  'Sweeper',
-  'Waterman',
-  'Gardener',
-  'Driver',
+  'Garden Cleaner',
+  'Tank / Drain Cleaning Service',
+  'Cabs',
   'Other',
 ];
 
@@ -49,7 +52,7 @@ window.WorkerContactsPage = {
         <td>${Util.escapeHtml(w.name)}</td>
         <td>${Util.escapeHtml(w.mobile)}</td>
         <td>${Util.escapeHtml(w.mobile2 || '-')}</td>
-        <td>${Util.escapeHtml(w.profession)}</td>
+        <td>${Util.escapeHtml((w.categories || []).join(', '))}</td>
         <td>${Util.escapeHtml(w.title || '-')}</td>
         <td class="toolbar">
           <button class="small secondary" data-edit="${w.id}">Edit</button>
@@ -82,19 +85,23 @@ window.WorkerContactsPage = {
   renderForm(panel, w) {
     if (!panel) return;
     const isEdit = !!w;
-    // keep a category saved before this list existed selectable when editing
-    const categories = isEdit && w.profession && !WORKER_CATEGORIES.includes(w.profession) ? [...WORKER_CATEGORIES, w.profession] : WORKER_CATEGORIES;
+    const selected = w?.categories || [];
+    // keep categories saved before this list existed selectable when editing
+    const categories = [...WORKER_CATEGORIES, ...selected.filter((c) => !WORKER_CATEGORIES.includes(c))];
     panel.innerHTML = `
       <div class="panel-header"><h3>${isEdit ? 'Edit Contact' : 'Add Worker Contact'}</h3></div>
       <form id="workerForm">
         <div class="field"><label>Name</label><input id="f_name" required maxlength="80" value="${Util.escapeHtml(w?.name || '')}" /></div>
         <div class="field"><label>Mobile No</label><input id="f_mobile" type="tel" required maxlength="20" value="${Util.escapeHtml(w?.mobile || '')}" /></div>
         <div class="field"><label>Second Mobile No (optional)</label><input id="f_mobile2" type="tel" maxlength="20" value="${Util.escapeHtml(w?.mobile2 || '')}" /></div>
-        <div class="field"><label>Category</label>
-          <select id="f_profession" required>
-            <option value="">Select category</option>
-            ${categories.map((c) => `<option value="${Util.escapeHtml(c)}" ${c === w?.profession ? 'selected' : ''}>${Util.escapeHtml(c)}</option>`).join('')}
-          </select>
+        <div class="field"><label>Categories (select one or more)</label>
+          <div id="f_categories" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:6px 16px;">
+            ${categories
+              .map(
+                (c) => `<label style="font-weight:normal;"><input type="checkbox" name="category" value="${Util.escapeHtml(c)}" ${selected.includes(c) ? 'checked' : ''} /> ${Util.escapeHtml(c)}</label>`
+              )
+              .join('')}
+          </div>
         </div>
         <div class="field"><label>Title (optional)</label><input id="f_title" maxlength="80" placeholder="e.g. House wiring specialist" value="${Util.escapeHtml(w?.title || '')}" /></div>
         <div class="toolbar mt-16">
@@ -110,9 +117,10 @@ window.WorkerContactsPage = {
         name: document.getElementById('f_name').value.trim(),
         mobile: document.getElementById('f_mobile').value.trim(),
         mobile2: document.getElementById('f_mobile2').value.trim(),
-        profession: document.getElementById('f_profession').value.trim(),
+        categories: [...document.querySelectorAll('#f_categories input:checked')].map((i) => i.value),
         title: document.getElementById('f_title').value.trim(),
       };
+      if (!payload.categories.length) return this.showAlert('Select at least one category.');
       try {
         if (isEdit) {
           await Api.put(`/worker-contacts/${w.id}`, payload);
