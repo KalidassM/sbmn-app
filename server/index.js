@@ -71,10 +71,6 @@ app.use('/api/reports', reportsRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-app.get('/worker-contacts', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'worker-contacts.html'));
-});
-
 app.get('/donate', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'donate.html'));
 });

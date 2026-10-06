@@ -17,7 +17,8 @@ function clean(body) {
   };
 }
 
-router.get('/', requireAuth, requireAdmin, (req, res) => {
+// Any logged-in user (member or admin) can view; only admins can change
+router.get('/', requireAuth, (req, res) => {
   const rows = db
     .prepare('SELECT * FROM worker_contacts ORDER BY profession COLLATE NOCASE, name COLLATE NOCASE')
     .all();

@@ -21,21 +21,32 @@ const WORKER_CATEGORIES = [
 ];
 
 window.WorkerContactsPage = {
+  workers: [],
+
   async render(container) {
+    const isAdmin = Util.isAdmin(Api.getUser());
+    this.isAdmin = isAdmin;
+    const cols = isAdmin ? 6 : 5;
     container.innerHTML = `
       <h1>Worker Contacts</h1>
-      <p class="page-sub">Plumbers, electricians and other workers shown on the public site</p>
+      <p class="page-sub">Plumbers, electricians and other workers serving the Nagar</p>
       <div id="alertBox"></div>
-      <div class="panel" id="formPanel"></div>
+      ${isAdmin ? '<div class="panel" id="formPanel"></div>' : ''}
       <div class="panel">
         <div class="panel-header"><h3>All Contacts</h3></div>
+        <div class="toolbar" style="margin-bottom:12px;">
+          <input id="f_search" placeholder="Search by name, category or number" style="max-width:300px;" />
+          <select id="f_filter" style="max-width:260px;"><option value="">All categories</option></select>
+        </div>
         <table>
-          <thead><tr><th>Name</th><th>Mobile No</th><th>Second No</th><th>Category</th><th>Title</th><th></th></tr></thead>
-          <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
+          <thead><tr><th>Name</th><th>Mobile No</th><th>Second No</th><th>Category</th><th>Title</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <tbody id="rows"><tr><td colspan="${cols}">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
-    this.renderForm(document.getElementById('formPanel'), null);
+    if (isAdmin) this.renderForm(document.getElementById('formPanel'), null);
+    document.getElementById('f_search').addEventListener('input', () => this.renderRows());
+    document.getElementById('f_filter').addEventListener('change', () => this.renderRows());
     await this.loadRows();
   },
 
@@ -45,10 +56,31 @@ window.WorkerContactsPage = {
   },
 
   async loadRows() {
-    const workers = await Api.get('/worker-contacts');
+    this.workers = await Api.get('/worker-contacts');
+    const filter = document.getElementById('f_filter');
+    const current = filter.value;
+    const used = [...new Set(this.workers.flatMap((w) => w.categories || []))].sort();
+    filter.innerHTML =
+      '<option value="">All categories</option>' +
+      used.map((c) => `<option value="${Util.escapeHtml(c)}">${Util.escapeHtml(c)}</option>`).join('');
+    filter.value = used.includes(current) ? current : '';
+    this.renderRows();
+  },
+
+  renderRows() {
+    const isAdmin = this.isAdmin;
+    const cols = isAdmin ? 6 : 5;
+    const q = document.getElementById('f_search').value.trim().toLowerCase();
+    const cat = document.getElementById('f_filter').value;
+    const workers = this.workers.filter(
+      (w) =>
+        (!cat || (w.categories || []).includes(cat)) &&
+        (!q || `${w.name} ${(w.categories || []).join(' ')} ${w.title || ''} ${w.mobile} ${w.mobile2 || ''}`.toLowerCase().includes(q))
+    );
+    const tel = (n) => (n ? `<a href="tel:${Util.escapeHtml(n)}">${Util.escapeHtml(n)}</a>` : '-');
     const tbody = document.getElementById('rows');
     if (!workers.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No contacts yet</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="${cols}">${this.workers.length ? 'No contacts match' : 'No contacts yet'}</td></tr>`;
       return;
     }
     tbody.innerHTML = workers
@@ -56,21 +88,26 @@ window.WorkerContactsPage = {
         (w) => `
       <tr>
         <td>${Util.escapeHtml(w.name)}</td>
-        <td>${Util.escapeHtml(w.mobile)}</td>
-        <td>${Util.escapeHtml(w.mobile2 || '-')}</td>
+        <td>${tel(w.mobile)}</td>
+        <td>${tel(w.mobile2)}</td>
         <td>${Util.escapeHtml((w.categories || []).join(', '))}</td>
         <td>${Util.escapeHtml(w.title || '-')}</td>
-        <td class="toolbar">
+        ${
+          isAdmin
+            ? `<td class="toolbar">
           <button class="small secondary" data-edit="${w.id}">Edit</button>
           <button class="small danger" data-del="${w.id}">Delete</button>
-        </td>
+        </td>`
+            : ''
+        }
       </tr>`
       )
       .join('');
 
+    if (!isAdmin) return;
     tbody.querySelectorAll('[data-edit]').forEach((btn) =>
       btn.addEventListener('click', () => {
-        const w = workers.find((x) => String(x.id) === btn.dataset.edit);
+        const w = this.workers.find((x) => String(x.id) === btn.dataset.edit);
         this.renderForm(document.getElementById('formPanel'), w);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })

@@ -379,3 +379,26 @@ label {
 }
 
 input:disabled { background: #CCC; }
+/* Worker directory (member / admin view) */
+.wd-tools { display: flex; flex-direction: column; gap: 12px; align-items: center; margin: 8px 0 4px; }
+.wd-search { max-width: 420px; border-radius: 999px; padding: 10px 16px; }
+.wd-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.wd-chip { border: 1px solid var(--border); background: var(--panel); color: var(--text); padding: 5px 14px; border-radius: 999px; font-size: 0.82rem; cursor: pointer; }
+.wd-chip:hover { border-color: var(--primary); }
+.wd-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.wd-group { margin-top: 26px; }
+.wd-group h2 { font-size: 1.05rem; color: var(--primary-dark); padding-bottom: 6px; margin-bottom: 14px; border-bottom: 2px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.wd-count { font-size: 0.72rem; font-weight: 600; background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 9px; }
+.wd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.wd-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06); display: flex; align-items: center; gap: 14px; }
+.wd-avatar { flex: 0 0 46px; height: 46px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.wd-info { flex: 1; min-width: 0; }
+.wd-info h3 { font-size: 1rem; overflow-wrap: anywhere; margin: 0; }
+.wd-title { color: var(--primary); font-size: 0.85rem; font-weight: 600; }
+.wd-mobile { color: var(--muted); font-size: 0.88rem; }
+.wd-calls { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; text-align: center; }
+.wd-call { background: var(--danger); color: #fff; text-decoration: none; font-size: 0.85rem; font-weight: 600; padding: 8px 14px; border-radius: 999px; }
+.wd-call.alt { background: var(--primary); }
+.wd-call:hover { opacity: 0.88; }
+.wd-empty { text-align: center; color: var(--muted); padding: 40px 0; }
+@media (max-width: 520px) { .wd-grid { grid-template-columns: 1fr; } }
