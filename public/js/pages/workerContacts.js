@@ -12,6 +12,8 @@ const WORKER_CATEGORIES = [
   'Tank / Drain Cleaning Service',
   'Cabs',
   'Lorry Water Service',
+  'Samiyana Panthal',
+  'Earth Digging',
   'Other',
 ];
 
