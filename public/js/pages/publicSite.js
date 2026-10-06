@@ -65,9 +65,10 @@ document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
 })();
 
 /* ---------- auth (reuses the same admin login as the member portal) ---------- */
-function isAdmin() {
+// Only super admins get the add/edit/remove controls on the public site (the backend still allows admins)
+function isSuperAdmin() {
   const user = Api.getUser();
-  return !!(user && Api.getToken() && (user.role === 'admin' || user.role === 'super_admin'));
+  return !!(user && Api.getToken() && user.role === 'super_admin');
 }
 
 const authNavBtn = document.getElementById('authNavBtn');
@@ -76,7 +77,7 @@ const loginForm = document.getElementById('loginForm');
 const loginError = document.getElementById('loginError');
 
 function updateAuthUI() {
-  const admin = isAdmin();
+  const admin = isSuperAdmin();
   document.getElementById('showNoticeForm').style.display = admin ? '' : 'none';
   document.getElementById('showEventForm').style.display = admin ? '' : 'none';
   document.getElementById('showMemberForm').style.display = admin ? '' : 'none';
@@ -101,7 +102,7 @@ function closeLoginModal() {
 
 if (authNavBtn) {
   authNavBtn.addEventListener('click', () => {
-    if (isAdmin()) {
+    if (isSuperAdmin()) {
       Api.clearSession();
       updateAuthUI();
     } else {
@@ -121,8 +122,8 @@ loginForm.addEventListener('submit', async (e) => {
   const password = document.getElementById('loginPassword').value;
   try {
     const data = await Api.post('/auth/login', { username, password });
-    if (data.user.role !== 'admin' && data.user.role !== 'super_admin') {
-      loginError.textContent = 'Only committee (admin) accounts can manage this page.';
+    if (data.user.role !== 'super_admin') {
+      loginError.textContent = 'Only super admin accounts can manage this page.';
       return;
     }
     Api.setSession(data.token, data.user);
@@ -228,7 +229,7 @@ async function renderNotices() {
       <h4>${escapeHtml(n.title)}</h4>
       <p>${escapeHtml(n.body)}</p>
       ${
-        isAdmin()
+        isSuperAdmin()
           ? `<div class="notice-actions">
         <button class="link-btn edit-btn" data-id="${n.id}">Edit</button>
         <button class="link-btn remove-btn" data-id="${n.id}">Remove</button>
@@ -325,7 +326,7 @@ async function renderEvents() {
         ${ev.venue ? `<span class="event-venue">${escapeHtml(ev.venue)}</span>` : ''}
         <p>${escapeHtml(ev.description || '')}</p>
         ${
-          isAdmin()
+          isSuperAdmin()
             ? `<div class="event-actions">
           <button class="link-btn edit-btn" data-id="${ev.id}">Edit</button>
           <button class="link-btn remove-btn" data-id="${ev.id}">Remove</button>
@@ -419,12 +420,12 @@ async function renderCommittee() {
     const card = document.createElement('div');
     card.className = 'member-card';
     card.innerHTML = `
-      ${isAdmin() ? `<button class="remove-x" data-id="${m.id}" aria-label="Remove member">&times;</button>` : ''}
+      ${isSuperAdmin() ? `<button class="remove-x" data-id="${m.id}" aria-label="Remove member">&times;</button>` : ''}
       <div class="avatar-ring">${avatar}</div>
       <h4>${escapeHtml(m.member_name)}</h4>
       <div class="member-role">${escapeHtml(m.designation)}</div>
       ${m.member_phone ? `<a class="member-mobile" href="tel:${escapeHtml(m.member_phone)}">${escapeHtml(m.member_phone)}</a>` : ''}
-      ${isAdmin() ? `<div class="member-actions"><button class="link-btn edit-btn" data-id="${m.id}">Edit</button></div>` : ''}
+      ${isSuperAdmin() ? `<div class="member-actions"><button class="link-btn edit-btn" data-id="${m.id}">Edit</button></div>` : ''}
     `;
     const removeBtn = card.querySelector('.remove-x');
     if (removeBtn) {
@@ -453,7 +454,7 @@ const memberPhotoHint = document.getElementById('memberPhotoHint');
 const memberSelect = document.getElementById('memberSelect');
 
 async function ensureMembersLoaded() {
-  if (allMembers.length || !isAdmin()) return;
+  if (allMembers.length || !isSuperAdmin()) return;
   try {
     allMembers = await Api.get('/members');
     memberSelect.innerHTML = allMembers.map((m) => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
