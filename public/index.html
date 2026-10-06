@@ -292,7 +292,8 @@
   .event-actions{display:flex; gap:14px;}
 
   /* ---------- COMMITTEE ---------- */
-  .committee-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:20px;}
+  .committee-grid{display:flex; flex-wrap:wrap; justify-content:center; gap:20px;}
+  .committee-grid .member-card{flex:0 1 250px; width:250px; max-width:100%;}
   .member-card{
     background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 18px; text-align:center;
     box-shadow:var(--shadow); position:relative;

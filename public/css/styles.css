@@ -266,6 +266,13 @@ input[type="checkbox"] {
   width: auto;
 }
 
+input[readonly],
+textarea[readonly] {
+  background: #eceff2;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 label {
   display: block;
   font-size: 0.8rem;

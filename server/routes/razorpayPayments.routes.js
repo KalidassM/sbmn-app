@@ -19,6 +19,23 @@ function loadDue(paymentId, user) {
   return { due };
 }
 
+// Accepts payment_ids (several dues paid in one go) or the older single payment_id
+function loadDues(body, user) {
+  const raw = Array.isArray(body.payment_ids) ? body.payment_ids : body.payment_id ? [body.payment_id] : [];
+  const ids = [...new Set(raw.map(Number).filter(Boolean))];
+  if (!ids.length) return { error: 400, message: 'payment_id is required' };
+  const dues = [];
+  for (const id of ids) {
+    const { due, error, message } = loadDue(id, user);
+    if (error) return { error, message };
+    dues.push(due);
+  }
+  if (new Set(dues.map((d) => d.member_id)).size > 1) {
+    return { error: 400, message: 'Dues for different members cannot be paid together' };
+  }
+  return { dues };
+}
+
 router.get('/config', requireAuth, (req, res) => {
   const settings = getGatewaySettings();
   res.json({
@@ -28,28 +45,26 @@ router.get('/config', requireAuth, (req, res) => {
 });
 
 router.post('/order', requireAuth, async (req, res) => {
-  const { payment_id } = req.body || {};
-  if (!payment_id) return res.status(400).json({ error: 'payment_id is required' });
-
   const client = getRazorpayClient();
   if (!client) {
     return res.status(400).json({ error: 'Online payments are not configured yet. Ask an admin to set up Razorpay in Payment Settings.' });
   }
 
-  const { due, error, message } = loadDue(payment_id, req.user);
+  const { dues, error, message } = loadDues(req.body || {}, req.user);
   if (error) return res.status(error).json({ error: message });
 
-  const remaining = Number(due.amount_due) - Number(due.amount_paid);
+  const remaining = dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
   const amountPaise = Math.round(remaining * 100);
 
   try {
     const order = await client.orders.create({
       amount: amountPaise,
       currency: 'INR',
-      receipt: `due_${due.id}`,
-      notes: { maintenance_payment_id: String(due.id), member_id: String(due.member_id) },
+      receipt: `due_${dues[0].id}_x${dues.length}`,
+      notes: { maintenance_payment_ids: dues.map((d) => d.id).join(','), member_id: String(dues[0].member_id) },
     });
-    db.prepare('UPDATE maintenance_payments SET razorpay_order_id = ? WHERE id = ?').run(order.id, due.id);
+    const setOrder = db.prepare('UPDATE maintenance_payments SET razorpay_order_id = ? WHERE id = ?');
+    dues.forEach((d) => setOrder.run(order.id, d.id));
     const settings = getGatewaySettings();
     res.json({
       orderId: order.id,
@@ -65,8 +80,8 @@ router.post('/order', requireAuth, async (req, res) => {
 });
 
 router.post('/verify', requireAuth, (req, res) => {
-  const { payment_id, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
-  if (!payment_id || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ error: 'Missing payment verification fields' });
   }
 
@@ -75,10 +90,10 @@ router.post('/verify', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Online payments are not configured' });
   }
 
-  const { due, error, message } = loadDue(payment_id, req.user);
+  const { dues, error, message } = loadDues(req.body || {}, req.user);
   if (error) return res.status(error).json({ error: message });
 
-  if (due.razorpay_order_id !== razorpay_order_id) {
+  if (dues.some((d) => d.razorpay_order_id !== razorpay_order_id)) {
     return res.status(400).json({ error: 'Order does not match this due' });
   }
 
@@ -86,25 +101,32 @@ router.post('/verify', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Payment signature verification failed' });
   }
 
-  db.prepare(
+  const markPaid = db.prepare(
     `UPDATE maintenance_payments
      SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), paid_at = datetime('now'), razorpay_payment_id = ?,
          payment_mode = 'Razorpay', reference_no = ?
      WHERE id = ?`
-  ).run(razorpay_payment_id, razorpay_payment_id, due.id);
+  );
+  const updatedDues = db.transaction(() =>
+    dues.map((d) => {
+      markPaid.run(razorpay_payment_id, razorpay_payment_id, d.id);
+      return db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(d.id);
+    })
+  )();
 
-  const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
-  notifyAdminOfPayment(updated);
-  notifyPaymentWhatsApp([updated]);
-  const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updated.member_id);
-  logActivity({
-    actor: req.user?.username,
-    action: 'payment',
-    entityType: 'maintenance_payment',
-    entityId: updated.id,
-    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${updated.amount_paid} online for ${updated.month}/${updated.year}`,
+  const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updatedDues[0].member_id);
+  updatedDues.forEach((updated) => {
+    notifyAdminOfPayment(updated);
+    logActivity({
+      actor: req.user?.username,
+      action: 'payment',
+      entityType: 'maintenance_payment',
+      entityId: updated.id,
+      description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${updated.amount_paid} online for ${updated.month}/${updated.year}`,
+    });
   });
-  res.json({ ok: true, payment: updated });
+  notifyPaymentWhatsApp(updatedDues);
+  res.json({ ok: true, payments: updatedDues, payment: updatedDues[0] });
 });
 
 module.exports = router;

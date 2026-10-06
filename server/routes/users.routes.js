@@ -149,6 +149,52 @@ router.post('/bulk-create-for-core-members', requireAuth, requireSuperAdmin, (re
   res.json({ created, upgraded, createdAccounts, skipped });
 });
 
+// Edits username / role / linked member (password changes go through reset-password)
+router.put('/:id', requireAuth, requireSuperAdmin, (req, res) => {
+  const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'User not found' });
+
+  const { username, role, member_id } = req.body || {};
+  const newUsername = (username || '').toString().trim();
+  if (!newUsername) return res.status(400).json({ error: 'username is required' });
+  if (!['member', 'admin', 'super_admin'].includes(role)) return res.status(400).json({ error: 'A valid role is required' });
+
+  if (existing.username === 'admin' && (newUsername !== 'admin' || role !== 'super_admin')) {
+    return res.status(400).json({ error: 'The default admin account must keep its username and Super Admin role' });
+  }
+  if (existing.id === req.user.id && role !== existing.role) {
+    return res.status(400).json({ error: 'You cannot change your own role' });
+  }
+  if (member_id && !db.prepare('SELECT id FROM members WHERE id = ?').get(member_id)) {
+    return res.status(400).json({ error: 'Linked member not found' });
+  }
+
+  try {
+    db.prepare('UPDATE users SET username = ?, role = ?, member_id = ? WHERE id = ?').run(
+      newUsername,
+      role,
+      member_id || null,
+      existing.id
+    );
+  } catch (err) {
+    return res.status(400).json({ error: 'Username already exists' });
+  }
+  const row = db
+    .prepare(
+      `SELECT u.id, u.username, u.role, u.member_id, m.name AS member_name, u.created_at, u.must_change_password, u.last_login_at
+       FROM users u LEFT JOIN members m ON m.id = u.member_id WHERE u.id = ?`
+    )
+    .get(existing.id);
+  logActivity({
+    actor: req.user?.username,
+    action: 'update',
+    entityType: 'user',
+    entityId: row.id,
+    description: `Updated user ${existing.username}${existing.username !== row.username ? ` (now ${row.username})` : ''} (role: ${row.role})`,
+  });
+  res.json(row);
+});
+
 router.put('/:id/reset-password', requireAuth, requireSuperAdmin, (req, res) => {
   const { password } = req.body || {};
   if (!password) return res.status(400).json({ error: 'password is required' });

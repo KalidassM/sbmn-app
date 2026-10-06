@@ -11,7 +11,6 @@ window.MaintenancePage = {
     container.innerHTML = `
       <h1>Monthly Maintenance</h1>
       <p class="page-sub">Track maintenance dues collection</p>
-      ${!isAdmin ? `<p class="page-sub" style="margin-top:-14px;">Want to pay online yourself? Visit <a href="/pay-monthly-maintenance" target="_blank">the maintenance payment page</a>.</p>` : ''}
       <div id="alertBox"></div>
 
       <div class="stat-grid" id="monthSummary"></div>

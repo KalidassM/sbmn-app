@@ -1,4 +1,6 @@
 window.UsersPage = {
+  users: [],
+
   async render(container) {
     const isSuperAdmin = Api.getUser().role === 'super_admin';
     container.innerHTML = `
@@ -118,6 +120,7 @@ window.UsersPage = {
   async loadRows() {
     const isSuperAdmin = Api.getUser().role === 'super_admin';
     const users = await Api.get('/users');
+    this.users = users;
     const rows = document.getElementById('rows');
     rows.innerHTML = users
       .map(
@@ -129,6 +132,7 @@ window.UsersPage = {
         <td>${u.must_change_password ? '<span class="badge unpaid">must change on login</span>' : '-'}</td>
         <td>${u.last_login_at ? Util.formatDateTime(u.last_login_at) : '<span class="text-muted">never</span>'}</td>
         <td class="toolbar">
+          ${isSuperAdmin ? `<button class="small secondary" data-edit="${u.id}">Edit</button>` : ''}
           ${isSuperAdmin ? `<button class="small secondary" data-reset="${u.id}">Reset Password</button>` : ''}
           ${u.username !== 'admin' ? `<button class="small danger" data-del="${u.id}">Delete</button>` : ''}
         </td>
@@ -136,6 +140,13 @@ window.UsersPage = {
       )
       .join('');
 
+    rows.querySelectorAll('[data-edit]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const u = this.users.find((x) => String(x.id) === btn.dataset.edit);
+        this.renderForm(document.getElementById('formPanel'), u);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      })
+    );
     rows.querySelectorAll('[data-reset]').forEach((btn) =>
       btn.addEventListener('click', async () => {
         const password = prompt('Enter a new password for this account:');
@@ -161,30 +172,34 @@ window.UsersPage = {
     );
   },
 
-  renderForm(panel) {
+  renderForm(panel, u) {
     const isSuperAdmin = Api.getUser().role === 'super_admin';
+    const isEdit = !!u;
     const memberOptions =
       '<option value="">-- No linked member --</option>' +
       this.members
-        .filter((m) => m.status === 'active')
-        .map((m) => `<option value="${m.id}">${Util.escapeHtml(m.name)}</option>`)
+        .filter((m) => m.status === 'active' || (isEdit && m.id === u.member_id))
+        .map((m) => `<option value="${m.id}" ${isEdit && m.id === u.member_id ? 'selected' : ''}>${Util.escapeHtml(m.site_no ? `${m.name} - Site No #${m.site_no}` : m.name)}</option>`)
         .join('');
     panel.innerHTML = `
-      <div class="panel-header"><h3>Create Login Account</h3></div>
+      <div class="panel-header"><h3>${isEdit ? `Edit Login Account — ${Util.escapeHtml(u.username)}` : 'Create Login Account'}</h3></div>
       <form id="userForm">
         <div class="form-grid">
-          <div class="field"><label>Username</label><input id="u_username" required /></div>
-          <div class="field"><label>Password</label><input id="u_password" type="password" required /></div>
+          <div class="field"><label>Username</label><input id="u_username" required value="${Util.escapeHtml(u?.username || '')}" ${isEdit && u.username === 'admin' ? 'readonly' : ''} /></div>
+          ${isEdit ? '' : '<div class="field"><label>Password</label><input id="u_password" type="password" required /></div>'}
           <div class="field"><label>Role</label>
             <select id="u_role">
-              <option value="member">Member (view-only)</option>
-              <option value="admin">Admin / Core Member (No Settings access)</option>
-              ${isSuperAdmin ? '<option value="super_admin">Super Admin (full access)</option>' : ''}
+              <option value="member" ${u?.role === 'member' ? 'selected' : ''}>Member (view-only)</option>
+              <option value="admin" ${u?.role === 'admin' ? 'selected' : ''}>Admin / Core Member (No Settings access)</option>
+              ${isSuperAdmin ? `<option value="super_admin" ${u?.role === 'super_admin' ? 'selected' : ''}>Super Admin (full access)</option>` : ''}
             </select>
           </div>
           <div class="field"><label>Linked Member</label><select id="u_member">${memberOptions}</select></div>
         </div>
-        <div class="toolbar mt-16"><button type="submit">Create Account</button></div>
+        <div class="toolbar mt-16">
+          <button type="submit">${isEdit ? 'Save Changes' : 'Create Account'}</button>
+          ${isEdit ? '<button type="button" class="secondary" id="cancelEdit">Cancel</button>' : ''}
+        </div>
       </form>
     `;
     document.getElementById('userForm').addEventListener('submit', async (e) => {
@@ -192,18 +207,26 @@ window.UsersPage = {
       const memberId = document.getElementById('u_member').value;
       const payload = {
         username: document.getElementById('u_username').value.trim(),
-        password: document.getElementById('u_password').value,
         role: document.getElementById('u_role').value,
         member_id: memberId ? Number(memberId) : null,
       };
       try {
-        await Api.post('/users', payload);
-        e.target.reset();
-        await this.loadRows();
-        this.showAlert('Account created.', 'success');
+        if (isEdit) {
+          await Api.put(`/users/${u.id}`, payload);
+          this.renderForm(panel);
+          await this.loadRows();
+          this.showAlert('Account updated. Role changes apply the next time that user logs in.', 'success');
+        } else {
+          payload.password = document.getElementById('u_password').value;
+          await Api.post('/users', payload);
+          e.target.reset();
+          await this.loadRows();
+          this.showAlert('Account created.', 'success');
+        }
       } catch (err) {
         this.showAlert(err.message);
       }
     });
+    if (isEdit) document.getElementById('cancelEdit').addEventListener('click', () => this.renderForm(panel));
   },
 };
