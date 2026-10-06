@@ -44,8 +44,12 @@ router.get('/committee', (req, res) => {
   res.json(rows);
 });
 
+const MESSAGE_TYPES = ['Feedback', 'Complaint', 'Suggestion', 'Enquiry', 'Other'];
+
 router.post('/contact-messages', (req, res) => {
-  const { name, house_no, phone, email, message } = req.body || {};
+  const { name, house_no, phone, email, message, message_type } = req.body || {};
+  const cleanType = MESSAGE_TYPES.includes(message_type) ? message_type : null;
+  if (!cleanType) return res.status(400).json({ error: 'Please select a valid message type' });
   const cleanName = (name || '').toString().trim();
   const cleanPhone = (phone || '').toString().trim();
   const cleanMessage = (message || '').toString().trim();
@@ -55,9 +59,9 @@ router.post('/contact-messages', (req, res) => {
   const cleanHouseNo = (house_no || '').toString().trim().slice(0, 40) || null;
   const cleanEmail = (email || '').toString().trim().slice(0, 160) || null;
   db.prepare(
-    'INSERT INTO contact_messages (name, house_no, phone, email, message) VALUES (?, ?, ?, ?, ?)'
-  ).run(cleanName.slice(0, 120), cleanHouseNo, cleanPhone.slice(0, 32), cleanEmail, cleanMessage.slice(0, 1000));
-  notifyAdminOfContactMessage({ name: cleanName, house_no: cleanHouseNo, phone: cleanPhone, email: cleanEmail, message: cleanMessage });
+    'INSERT INTO contact_messages (name, house_no, phone, email, message, message_type) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(cleanName.slice(0, 120), cleanHouseNo, cleanPhone.slice(0, 32), cleanEmail, cleanMessage.slice(0, 1000), cleanType);
+  notifyAdminOfContactMessage({ name: cleanName, house_no: cleanHouseNo, phone: cleanPhone, email: cleanEmail, message: cleanMessage, message_type: cleanType });
   res.status(201).json({ ok: true });
 });
 

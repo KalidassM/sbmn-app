@@ -520,12 +520,13 @@ document.getElementById('contactForm').addEventListener('submit', async (e) => {
   const house_no = document.getElementById('cHouse').value.trim();
   const phone = document.getElementById('cPhone').value.trim();
   const email = document.getElementById('cEmail').value.trim();
+  const message_type = document.getElementById('cType').value;
   const message = document.getElementById('cMsg').value.trim();
 
   const submitBtn = e.target.querySelector('button[type=submit]');
   submitBtn.disabled = true;
   try {
-    await Api.post('/public/site/contact-messages', { name, house_no, phone, email, message });
+    await Api.post('/public/site/contact-messages', { name, house_no, phone, email, message, message_type });
     document.getElementById('contactSuccess').classList.add('show');
     e.target.reset();
     setTimeout(() => document.getElementById('contactSuccess').classList.remove('show'), 6000);

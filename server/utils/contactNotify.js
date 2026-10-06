@@ -17,10 +17,11 @@ async function notifyAdminOfContactMessage(msg) {
         <tr><td><strong>House No</strong></td><td>${msg.house_no || '-'}</td></tr>
         <tr><td><strong>Phone</strong></td><td>${msg.phone}</td></tr>
         <tr><td><strong>Email</strong></td><td>${msg.email || '-'}</td></tr>
+        <tr><td><strong>Type</strong></td><td>${msg.message_type}</td></tr>
         <tr><td><strong>Message</strong></td><td>${msg.message}</td></tr>
       </table>
     `;
-    await sendMail({ to, subject: `New contact message from ${msg.name}`, html });
+    await sendMail({ to, subject: `New ${msg.message_type.toLowerCase()} from ${msg.name}`, html });
   } catch (err) {
     console.error('Contact message notification email failed:', err.message);
   }

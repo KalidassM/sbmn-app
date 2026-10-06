@@ -172,6 +172,11 @@ if (!workerContactColumns.includes('title')) {
   db.exec('ALTER TABLE worker_contacts ADD COLUMN title TEXT');
 }
 
+const contactMessageColumns = db.prepare('PRAGMA table_info(contact_messages)').all().map((c) => c.name);
+if (!contactMessageColumns.includes('message_type')) {
+  db.exec("ALTER TABLE contact_messages ADD COLUMN message_type TEXT DEFAULT 'Other'");
+}
+
 const generalSettingsColumns = db.prepare('PRAGMA table_info(general_settings)').all().map((c) => c.name);
 ['opening_bank_balance', 'opening_petty_cash_balance'].forEach((col) => {
   if (generalSettingsColumns.includes(col)) {

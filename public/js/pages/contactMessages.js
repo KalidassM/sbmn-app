@@ -6,8 +6,8 @@ window.ContactMessagesPage = {
       <div id="alertBox"></div>
       <div class="panel">
         <table>
-          <thead><tr><th>Date</th><th>Name</th><th>House/Plot</th><th>Phone</th><th>Email</th><th>Message</th><th></th></tr></thead>
-          <tbody id="rows"><tr><td colspan="7">Loading…</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Type</th><th>Name</th><th>House/Plot</th><th>Phone</th><th>Email</th><th>Message</th><th></th></tr></thead>
+          <tbody id="rows"><tr><td colspan="8">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -23,7 +23,7 @@ window.ContactMessagesPage = {
     const messages = await Api.get('/contact-messages');
     const tbody = document.getElementById('rows');
     if (!messages.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No messages yet</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="8">No messages yet</td></tr>`;
       return;
     }
     tbody.innerHTML = messages
@@ -31,6 +31,7 @@ window.ContactMessagesPage = {
         (m) => `
       <tr>
         <td>${Util.formatDate(m.created_at)}</td>
+        <td>${Util.escapeHtml(m.message_type || 'Other')}</td>
         <td>${Util.escapeHtml(m.name)}</td>
         <td>${Util.escapeHtml(m.house_no || '-')}</td>
         <td>${Util.escapeHtml(m.phone)}</td>

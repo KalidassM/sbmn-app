@@ -644,6 +644,17 @@ The committee works together on community matters, resident concerns, neighbourh
           <div class="field"><label for="cEmail">Email</label><input type="email" id="cEmail"></div>
         </div>
         <div class="field">
+          <label for="cType">Message Type</label>
+          <select id="cType" required>
+            <option value="" disabled selected>Select a type</option>
+            <option value="Feedback">Feedback</option>
+            <option value="Complaint">Complaint</option>
+            <option value="Suggestion">Suggestion</option>
+            <option value="Enquiry">Enquiry</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="cMsg">Message</label>
           <textarea id="cMsg" rows="4" required placeholder="Tell us how we can help"></textarea>
         </div>
