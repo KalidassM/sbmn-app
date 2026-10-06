@@ -16,10 +16,10 @@
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--paper); color:var(--ink); line-height:1.5;}
-  .container{max-width:1080px; margin:0 auto; padding:0 20px;}
+  .container{max-width:1200px; margin:0 auto; padding:0 20px;}
 
   header{background:var(--green-dark); color:#fff; border-bottom:4px solid var(--gold);}
-  .bar{align-items:center; gap:16px; padding:14px 20px; max-width:1080px; margin:0 auto; display:flex; justify-content:space-between;}
+  .bar{align-items:center; gap:16px; padding:14px 20px; max-width:1200px; margin:0 auto; display:flex; justify-content:space-between;}
   .brand{display:flex; align-items:center; gap:12px; color:#fff; text-decoration:none;}
   .brand img{width:44px; height:44px; border-radius:50%; object-fit:cover;}
   .brand span{font-weight:700; font-size:0.98rem; line-height:1.2;}
@@ -43,21 +43,21 @@
   .group{margin-top:30px;}
   .group h2{font-size:1.1rem; color:var(--green-dark); padding-bottom:6px; margin-bottom:14px; border-bottom:2px solid var(--line); display:flex; align-items:center; gap:8px;}
   .group h2 .count{font-size:0.75rem; font-weight:600; background:var(--gold); color:var(--ink); border-radius:999px; padding:1px 9px;}
-  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px;}
-  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px;}
-  .card-top{display:flex; align-items:center; gap:12px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px;}
   .avatar{flex:0 0 46px; height:46px; border-radius:50%; background:var(--green); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;}
-  .card-top h3{font-size:1.02rem; flex:1; min-width:0; overflow-wrap:break-word;}
+  .info{flex:1; min-width:0;}
   .info h3{font-size:1rem; overflow-wrap:anywhere;}
-  .numbers{display:flex; flex-wrap:wrap; gap:8px;}
-  .call{flex:1 1 130px; text-align:center; background:var(--vermilion); color:#fff; text-decoration:none; font-size:0.9rem; font-weight:600; padding:9px 14px; border-radius:999px;}
+  .info .mobile{color:var(--muted); font-size:0.88rem;}
+  .calls{flex:0 0 auto; display:flex; flex-direction:column; gap:6px; align-items:stretch; text-align:center;}
+  .call{flex:0 0 auto; background:var(--vermilion); color:#fff; text-decoration:none; font-size:0.85rem; font-weight:600; padding:8px 14px; border-radius:999px;}
   .call.alt{background:var(--green);}
   .call.alt:hover{background:var(--green-dark);}
   .call:hover{background:#832A16;}
   .empty{text-align:center; color:var(--muted); padding:40px 0;}
 
   footer{margin-top:56px; background:var(--green-dark); color:#C9C0AA; text-align:center; font-size:0.85rem; padding:20px;}
-  @media (max-width:520px){.hero h1{font-size:1.5rem;} .brand small{display:none;}}
+  @media (max-width:520px){.grid{grid-template-columns:1fr;} .hero h1{font-size:1.5rem;} .brand small{display:none;}}
 </style>
 </head>
 <body>
@@ -128,14 +128,9 @@
               .map(
                 (w) => `
               <div class="card">
-                <div class="card-top">
-                  <div class="avatar">${esc(w.name.trim().charAt(0).toUpperCase())}</div>
-                  <h3>${esc(w.name)}</h3>
-                </div>
-                <div class="numbers">
-                  <a class="call" href="tel:${esc(w.mobile)}">&#128222; ${esc(w.mobile)}</a>
-                  ${w.mobile2 ? `<a class="call alt" href="tel:${esc(w.mobile2)}">&#128222; ${esc(w.mobile2)}</a>` : ''}
-                </div>
+                <div class="avatar">${esc(w.name.trim().charAt(0).toUpperCase())}</div>
+                <div class="info"><h3>${esc(w.name)}</h3><div class="mobile">${esc(w.mobile)}</div>${w.mobile2 ? `<div class="mobile">${esc(w.mobile2)}</div>` : ''}</div>
+                <div class="calls"><a class="call" href="tel:${esc(w.mobile)}">Call</a>${w.mobile2 ? `<a class="call alt" href="tel:${esc(w.mobile2)}">Call 2nd</a>` : ''}</div>
               </div>`
               )
               .join('')}
