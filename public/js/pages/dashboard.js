@@ -2,7 +2,6 @@ window.DashboardPage = {
   async render(container) {
     container.innerHTML = `<h1>Dashboard</h1><p class="page-sub">Overview of the association's finances and activity</p><div id="alertBox"></div><div id="content">Loading…</div>`;
     const content = document.getElementById('content');
-    const user = Api.getUser();
 
     const [summary, events, donations, notices] = await Promise.all([
       Api.get('/dashboard/summary'),
@@ -14,18 +13,15 @@ window.DashboardPage = {
     const upcoming = events
       .filter((e) => e.event_date >= Util.todayISO())
       .slice(0, 5);
-    // newest first: by donation date, then by when it was recorded
-    const myDonations = user.member_id
-      ? donations
-          .filter((d) => d.member_id === user.member_id)
-          .sort(
-            (a, b) =>
-              String(b.donation_date).localeCompare(String(a.donation_date)) ||
-              String(b.created_at || '').localeCompare(String(a.created_at || '')) ||
-              b.id - a.id
-          )
-          .slice(0, 5)
-      : [];
+    // latest 5 donations from everyone, newest first: by donation date, then by when it was recorded
+    const recentDonations = [...donations]
+      .sort(
+        (a, b) =>
+          String(b.donation_date).localeCompare(String(a.donation_date)) ||
+          String(b.created_at || '').localeCompare(String(a.created_at || '')) ||
+          b.id - a.id
+      )
+      .slice(0, 5);
     const recentNotices = notices.slice(0, 5);
 
     content.innerHTML = `
@@ -47,28 +43,23 @@ window.DashboardPage = {
         <div class="stat-card"><div class="label">Total Expenses</div><div class="value">${Util.money(summary.totalExpenses)}</div></div>
       </div>
 
-      ${
-        user.member_id
-          ? `
       <div class="panel">
-        <div class="panel-header"><h3>My Recent Donations</h3><a href="#/donations" class="btn secondary">View all</a></div>
+        <div class="panel-header"><h3>Recent Donations</h3><a href="#/donations" class="btn secondary">View all</a></div>
         <table>
-          <thead><tr><th>Date</th><th>Amount</th><th>Purpose</th><th>Status</th></tr></thead>
-          <tbody id="myDonationRows">
+          <thead><tr><th>Date</th><th>Donor</th><th>Amount</th><th>Purpose</th><th>Status</th></tr></thead>
+          <tbody id="recentDonationRows">
             ${
-              myDonations.length
-                ? myDonations
+              recentDonations.length
+                ? recentDonations
                     .map(
-                      (d) => `<tr><td>${Util.formatDate(d.donation_date)}</td><td>${Util.money(d.amount)}</td><td>${Util.escapeHtml(d.purpose || '-')}</td><td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.status}</span></td></tr>`
+                      (d) => `<tr><td>${Util.formatDate(d.donation_date)}</td><td>${Util.escapeHtml(d.member_name || d.donor_name || '-')}</td><td>${Util.money(d.amount)}</td><td>${Util.escapeHtml(d.purpose || '-')}</td><td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.status}</span></td></tr>`
                     )
                     .join('')
-                : '<tr class="empty-row"><td colspan="4">You haven\'t made a donation yet</td></tr>'
+                : '<tr class="empty-row"><td colspan="5">No donations yet</td></tr>'
             }
           </tbody>
         </table>
-      </div>`
-          : ''
-      }
+      </div>
 
       <div class="panel">
         <div class="panel-header"><h3>Upcoming Events</h3><a href="#/events" class="btn secondary">View all</a></div>
