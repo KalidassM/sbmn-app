@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Worker Contacts — Sri Balamurugan Nagar Welfare Association</title>
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-48x48.png" />
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+<link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card" style="max-width:640px;">
+      <div style="text-align:center;margin-bottom:12px;">
+        <img src="/assets/sbmn-logo.png" alt="Sri Balamurugan Nagar Welfare Association logo" style="width:64px;height:64px;object-fit:cover;border-radius:50%;" />
+      </div>
+      <h1>Sri Balamurugan Nagar Welfare Association</h1>
+      <p class="sub">Worker contacts — plumbers, electricians and other service providers</p>
+      <table>
+        <thead><tr><th>Name</th><th>Work Profession</th><th>Mobile No</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="3">Loading…</td></tr></tbody>
+      </table>
+      <p style="text-align:center;margin-top:16px;"><a href="/">&larr; Back to home</a></p>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    function esc(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    (async () => {
+      const tbody = document.getElementById('rows');
+      try {
+        const workers = await Api.get('/public/site/worker-contacts');
+        tbody.innerHTML = workers.length
+          ? workers
+              .map(
+                (w) => `<tr><td>${esc(w.name)}</td><td>${esc(w.profession)}</td><td><a href="tel:${esc(w.mobile)}">${esc(w.mobile)}</a></td></tr>`
+              )
+              .join('')
+          : '<tr class="empty-row"><td colspan="3">No contacts listed yet</td></tr>';
+      } catch (e) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="3">Could not load contacts</td></tr>';
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -120,6 +120,14 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS worker_contacts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  profession TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS payment_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   upi_id TEXT,

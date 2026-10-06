@@ -28,6 +28,7 @@ const pettyCashRoutes = require('./routes/pettyCash.routes');
 const publicDonationsRoutes = require('./routes/publicDonations.routes');
 const noticeRoutes = require('./routes/notices.routes');
 const contactMessageRoutes = require('./routes/contactMessages.routes');
+const workerContactRoutes = require('./routes/workerContacts.routes');
 const publicSiteRoutes = require('./routes/publicSite.routes');
 const publicMaintenanceRoutes = require('./routes/publicMaintenance.routes');
 const generalSettingsRoutes = require('./routes/generalSettings.routes');
@@ -59,6 +60,7 @@ app.use('/api/petty-cash', pettyCashRoutes);
 app.use('/api/public/donations', publicDonationsRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/contact-messages', contactMessageRoutes);
+app.use('/api/worker-contacts', workerContactRoutes);
 app.use('/api/public/site', publicSiteRoutes);
 app.use('/api/public/maintenance', publicMaintenanceRoutes);
 app.use('/api/general-settings', generalSettingsRoutes);
@@ -68,6 +70,10 @@ app.use('/api/activity-log', activityLogRoutes);
 app.use('/api/reports', reportsRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+app.get('/worker-contacts', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'worker-contacts.html'));
+});
 
 app.get('/donate', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'donate.html'));

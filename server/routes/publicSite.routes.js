@@ -44,6 +44,13 @@ router.get('/committee', (req, res) => {
   res.json(rows);
 });
 
+router.get('/worker-contacts', (req, res) => {
+  const rows = db
+    .prepare('SELECT id, name, mobile, profession FROM worker_contacts ORDER BY profession COLLATE NOCASE, name COLLATE NOCASE')
+    .all();
+  res.json(rows);
+});
+
 router.post('/contact-messages', (req, res) => {
   const { name, house_no, phone, email, message } = req.body || {};
   const cleanName = (name || '').toString().trim();
