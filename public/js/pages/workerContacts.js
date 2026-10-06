@@ -11,6 +11,7 @@ const WORKER_CATEGORIES = [
   'Garden Cleaner',
   'Tank / Drain Cleaning Service',
   'Cabs',
+  'Lorry Water Service',
   'Other',
 ];
 
