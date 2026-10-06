@@ -14,7 +14,18 @@ window.DashboardPage = {
     const upcoming = events
       .filter((e) => e.event_date >= Util.todayISO())
       .slice(0, 5);
-    const myDonations = user.member_id ? donations.filter((d) => d.member_id === user.member_id).slice(0, 5) : [];
+    // newest first: by donation date, then by when it was recorded
+    const myDonations = user.member_id
+      ? donations
+          .filter((d) => d.member_id === user.member_id)
+          .sort(
+            (a, b) =>
+              String(b.donation_date).localeCompare(String(a.donation_date)) ||
+              String(b.created_at || '').localeCompare(String(a.created_at || '')) ||
+              b.id - a.id
+          )
+          .slice(0, 5)
+      : [];
     const recentNotices = notices.slice(0, 5);
 
     content.innerHTML = `
@@ -39,12 +50,6 @@ window.DashboardPage = {
       ${
         user.member_id
           ? `
-      <div class="panel">
-        <div class="panel-header"><h3>Make a Donation</h3></div>
-        <p class="page-sub" style="margin-top:-8px;">Support the association directly — pay online or via UPI QR code.</p>
-        <div id="donateForm"></div>
-      </div>
-
       <div class="panel">
         <div class="panel-header"><h3>My Recent Donations</h3><a href="#/donations" class="btn secondary">View all</a></div>
         <table>
@@ -101,128 +106,10 @@ window.DashboardPage = {
         </table>
       </div>
     `;
-
-    if (user.member_id) this.renderDonateForm();
   },
 
   showAlert(message, type = 'error') {
     const box = document.getElementById('alertBox');
     if (box) box.innerHTML = `<div class="alert ${type}">${Util.escapeHtml(message)}</div>`;
-  },
-
-  renderDonateForm() {
-    const el = document.getElementById('donateForm');
-    el.innerHTML = `
-      <form id="donateSelfForm">
-        <div class="form-grid">
-          <div class="field"><label>Amount (₹)</label><input id="ds_amount" type="number" min="1" step="0.01" required /></div>
-          <div class="field"><label>Purpose (optional)</label><input id="ds_purpose" placeholder="e.g. General fund, Annual function..." /></div>
-        </div>
-        <div class="toolbar mt-16"><button type="submit">Continue to Pay</button></div>
-      </form>
-    `;
-    document.getElementById('donateSelfForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const payload = {
-        amount: Number(document.getElementById('ds_amount').value),
-        purpose: document.getElementById('ds_purpose').value.trim(),
-      };
-      try {
-        const donation = await Api.post('/donations/self', payload);
-        this.showPayModal(donation);
-      } catch (err) {
-        this.showAlert(err.message);
-      }
-    });
-  },
-
-  async showPayModal(donation) {
-    Util.openModal(`
-      <h3>Complete Your Donation</h3>
-      <p style="font-size:1.4rem;font-weight:700;color:var(--primary-dark);">${Util.money(donation.amount)}</p>
-      <div id="gatewayContent"></div>
-      <div id="qrToggleWrap" class="mt-16"><button type="button" class="secondary small" id="toggleQrBtn">Or pay by scanning a UPI QR code</button></div>
-      <div id="qrContent"></div>
-      <div class="toolbar close-modal mt-16" style="justify-content:center;">
-        <button class="secondary" id="closeModalBtn">Close</button>
-      </div>
-    `);
-    document.getElementById('closeModalBtn').addEventListener('click', async () => {
-      Util.closeModal();
-      await this.render(document.getElementById('main'));
-    });
-    document.getElementById('toggleQrBtn').addEventListener('click', () => this.loadQr(donation));
-
-    const gatewayBox = document.getElementById('gatewayContent');
-    try {
-      const config = await Api.get('/payments/razorpay/config');
-      if (config.configured) {
-        gatewayBox.innerHTML = `<button id="payOnlineBtn" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-        document.getElementById('payOnlineBtn').addEventListener('click', () => this.payWithRazorpay(donation));
-        document.getElementById('qrToggleWrap').querySelector('button').textContent = 'Or scan a UPI QR code instead';
-      } else {
-        document.getElementById('qrToggleWrap').style.display = 'none';
-        await this.loadQr(donation);
-      }
-    } catch (err) {
-      gatewayBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-    }
-  },
-
-  async loadQr(donation) {
-    document.getElementById('toggleQrBtn').style.display = 'none';
-    const qrBox = document.getElementById('qrContent');
-    qrBox.innerHTML = '<p class="text-muted">Loading QR code…</p>';
-    try {
-      const note = `Donation - ${Api.getUser().username}`;
-      const data = await Api.get(`/payment-settings/qr?amount=${donation.amount}&note=${encodeURIComponent(note)}`);
-      qrBox.innerHTML = `
-        <img src="${data.qrDataUrl}" alt="UPI QR code" width="220" height="220" />
-        <p class="text-muted mt-16">Scan with any UPI app (GPay, PhonePe, Paytm...), or on your phone <a href="${Util.escapeHtml(data.upiUri)}">tap here to pay</a>.</p>
-        <p class="text-muted" style="font-size:0.78rem;">After paying, let a core member know so they can confirm your donation.</p>
-      `;
-    } catch (err) {
-      qrBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-    }
-  },
-
-  async payWithRazorpay(donation) {
-    const gatewayBox = document.getElementById('gatewayContent');
-    try {
-      const order = await Api.post(`/donations/self/${donation.id}/order`);
-      const rzp = new Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: order.payeeName,
-        description: `Donation - ${Api.getUser().username}`,
-        order_id: order.orderId,
-        handler: async (response) => {
-          gatewayBox.innerHTML = '<p class="text-muted">Verifying payment…</p>';
-          try {
-            await Api.post(`/donations/self/${donation.id}/verify`, {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-            Util.closeModal();
-            await this.render(document.getElementById('main'));
-            this.showAlert('Thank you! Your donation has been received.', 'success');
-          } catch (err) {
-            gatewayBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            gatewayBox.innerHTML = `<button id="payOnlineBtn" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-            document.getElementById('payOnlineBtn').addEventListener('click', () => this.payWithRazorpay(donation));
-          },
-        },
-        theme: { color: '#2f6f4e' },
-      });
-      rzp.open();
-    } catch (err) {
-      gatewayBox.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
-    }
   },
 };
