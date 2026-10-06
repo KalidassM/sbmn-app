@@ -9,39 +9,12 @@ const router = express.Router();
 
 const MAX_AMOUNT = 1000000;
 
-function loadPendingPublicDonation(donationId) {
-  const donation = db.prepare("SELECT * FROM donations WHERE id = ? AND source = 'public'").get(donationId);
-  if (!donation) return { error: 404, message: 'Donation not found' };
-  if (donation.status !== 'pending') {
-    return { error: 400, message: 'This donation has already been completed' };
-  }
-  return { donation };
+function clean(value, max) {
+  return (value || '').toString().trim().slice(0, max);
 }
 
-// No requireAuth on this router — well-wishers have no account. Only exposes what's needed to record and pay a donation.
-router.post('/', (req, res) => {
-  const { donor_name, donor_email, donor_phone, amount, purpose } = req.body || {};
-  const name = (donor_name || '').toString().trim();
-  if (!name) return res.status(400).json({ error: 'Your name is required' });
-  if (!amount || Number(amount) <= 0 || Number(amount) > MAX_AMOUNT) {
-    return res.status(400).json({ error: 'A valid amount is required' });
-  }
-  const info = db
-    .prepare(
-      `INSERT INTO donations (donor_name, donor_email, donor_phone, amount, purpose, status, source)
-       VALUES (?, ?, ?, ?, ?, 'pending', 'public')`
-    )
-    .run(name.slice(0, 120), (donor_email || '').toString().trim().slice(0, 160) || null, (donor_phone || '').toString().trim().slice(0, 32) || null, amount, (purpose || '').toString().trim().slice(0, 200) || null);
-  logActivity({
-    actor: 'public',
-    action: 'create',
-    entityType: 'donation',
-    entityId: info.lastInsertRowid,
-    description: `${name} pledged a donation of ₹${Number(amount)}${purpose ? ` for ${purpose}` : ''}`,
-  });
-  res.status(201).json({ id: info.lastInsertRowid, donor_name: name, amount: Number(amount) });
-});
-
+// No requireAuth on this router — well-wishers have no account. Only exposes what's needed to pay a donation.
+// Nothing is written to the donations table until the payment is verified, so an abandoned payment leaves no entry.
 router.get('/razorpay-config', (req, res) => {
   const settings = getGatewaySettings();
   res.json({
@@ -59,23 +32,32 @@ router.get('/qr', async (req, res) => {
   }
 });
 
-router.post('/:id/order', async (req, res) => {
+router.post('/order', async (req, res) => {
   const client = getRazorpayClient();
   if (!client) {
     return res.status(400).json({ error: 'Online payments are not configured yet. Please use the UPI QR code instead.' });
   }
-  const { donation, error, message } = loadPendingPublicDonation(req.params.id);
-  if (error) return res.status(error).json({ error: message });
+  const { donor_name, donor_email, donor_phone, amount, purpose } = req.body || {};
+  const name = clean(donor_name, 120);
+  if (!name) return res.status(400).json({ error: 'Your name is required' });
+  if (!amount || Number(amount) <= 0 || Number(amount) > MAX_AMOUNT) {
+    return res.status(400).json({ error: 'A valid amount is required' });
+  }
 
-  const amountPaise = Math.round(Number(donation.amount) * 100);
+  const amountPaise = Math.round(Number(amount) * 100);
   try {
+    // the donor details travel in the order notes; /verify reads them back from Razorpay
     const order = await client.orders.create({
       amount: amountPaise,
       currency: 'INR',
-      receipt: `donation_${donation.id}`,
-      notes: { donation_id: String(donation.id), donor_name: donation.donor_name || '' },
+      receipt: `donation_${Date.now()}`,
+      notes: {
+        donor_name: name,
+        donor_email: clean(donor_email, 160),
+        donor_phone: clean(donor_phone, 32),
+        purpose: clean(purpose, 200),
+      },
     });
-    db.prepare('UPDATE donations SET razorpay_order_id = ? WHERE id = ?').run(order.id, donation.id);
     const settings = getGatewaySettings();
     res.json({
       orderId: order.id,
@@ -90,30 +72,50 @@ router.post('/:id/order', async (req, res) => {
   }
 });
 
-router.post('/:id/verify', (req, res) => {
+router.post('/verify', async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ error: 'Missing payment verification fields' });
   }
 
   const settings = getGatewaySettings();
-  if (!settings.razorpay_key_secret) {
-    return res.status(400).json({ error: 'Online payments are not configured' });
-  }
+  const client = getRazorpayClient();
+  if (!client) return res.status(400).json({ error: 'Online payments are not configured' });
 
-  const { donation, error, message } = loadPendingPublicDonation(req.params.id);
-  if (error) return res.status(error).json({ error: message });
-
-  if (donation.razorpay_order_id !== razorpay_order_id) {
-    return res.status(400).json({ error: 'Order does not match this donation' });
-  }
   if (!verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, settings.razorpay_key_secret)) {
     return res.status(400).json({ error: 'Payment signature verification failed' });
   }
 
-  db.prepare(
-    `UPDATE donations SET status = 'completed', razorpay_payment_id = ?, donation_date = date('now') WHERE id = ?`
-  ).run(razorpay_payment_id, donation.id);
+  // already recorded (e.g. the verify call was retried)
+  const existing = db.prepare('SELECT id FROM donations WHERE razorpay_payment_id = ?').get(razorpay_payment_id);
+  if (existing) return res.json({ ok: true });
+
+  let order;
+  try {
+    order = await client.orders.fetch(razorpay_order_id);
+  } catch (err) {
+    console.error('Razorpay order fetch failed (public donation):', err.error || err.message || err);
+    return res.status(502).json({ error: 'Payment was received but could not be confirmed yet. Please contact a core member.' });
+  }
+  const notes = order.notes || {};
+  const name = clean(notes.donor_name, 120) || 'Well-wisher';
+  const amount = Number(order.amount) / 100;
+
+  const info = db
+    .prepare(
+      `INSERT INTO donations (donor_name, donor_email, donor_phone, amount, purpose, status, source, razorpay_order_id, razorpay_payment_id)
+       VALUES (?, ?, ?, ?, ?, 'completed', 'public', ?, ?)`
+    )
+    .run(
+      name,
+      clean(notes.donor_email, 160) || null,
+      clean(notes.donor_phone, 32) || null,
+      amount,
+      clean(notes.purpose, 200) || null,
+      razorpay_order_id,
+      razorpay_payment_id
+    );
+  const donation = db.prepare('SELECT * FROM donations WHERE id = ?').get(info.lastInsertRowid);
 
   notifyDonationWhatsApp(donation);
   logActivity({

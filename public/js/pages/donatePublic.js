@@ -70,7 +70,7 @@
       qrBox.innerHTML = `
         <img src="${data.qrDataUrl}" alt="UPI QR code" width="220" height="220" />
         <p class="text-muted mt-16">Scan with any UPI app (GPay, PhonePe, Paytm...), or on your phone <a href="${escapeHtml(data.upiUri)}">tap here to pay</a>.</p>
-        <p class="text-muted" style="font-size:0.78rem;">After paying, please let a core member know so they can confirm your donation.</p>
+        <p class="text-muted" style="font-size:0.78rem;">After paying, please let a core member know so they can record your donation.</p>
       `;
     } catch (err) {
       qrBox.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
@@ -80,7 +80,16 @@
   async function payWithRazorpay(donation) {
     const gatewayBox = document.getElementById('gatewayContent');
     try {
-      const order = await request(`/${donation.id}/order`, { method: 'POST' });
+      const order = await request('/order', {
+        method: 'POST',
+        body: {
+          donor_name: donation.donor_name,
+          donor_email: donation.donor_email,
+          donor_phone: donation.donor_phone,
+          amount: donation.amount,
+          purpose: donation.purpose,
+        },
+      });
       const rzp = new Razorpay({
         key: order.keyId,
         amount: order.amount,
@@ -91,7 +100,7 @@
         handler: async (response) => {
           gatewayBox.innerHTML = '<p class="text-muted">Verifying payment…</p>';
           try {
-            await request(`/${donation.id}/verify`, {
+            await request('/verify', {
               method: 'POST',
               body: {
                 razorpay_order_id: response.razorpay_order_id,
@@ -131,11 +140,9 @@
       amount: Number(document.getElementById('d_amount').value),
       purpose: document.getElementById('d_purpose').value.trim(),
     };
-    try {
-      const donation = await request('/', { method: 'POST', body: payload });
-      renderPaymentStep(donation);
-    } catch (err) {
-      showAlert(err.message);
-    }
+    if (!payload.donor_name) return showAlert('Your name is required');
+    if (!(payload.amount > 0)) return showAlert('A valid amount is required');
+    // nothing is saved yet: the donation is recorded by the server only after the payment succeeds
+    renderPaymentStep(payload);
   });
 })();
