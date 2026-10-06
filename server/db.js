@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS worker_contacts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   mobile TEXT NOT NULL,
+  mobile2 TEXT,
   profession TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -162,6 +163,11 @@ db.prepare('INSERT OR IGNORE INTO general_settings (id) VALUES (1)').run();
 
 // Migration: drop the pre-digital-tracking opening balances (bank account + petty cash box) -
 // retired feature, balances are now purely computed from actual transaction history
+const workerContactColumns = db.prepare('PRAGMA table_info(worker_contacts)').all().map((c) => c.name);
+if (!workerContactColumns.includes('mobile2')) {
+  db.exec('ALTER TABLE worker_contacts ADD COLUMN mobile2 TEXT');
+}
+
 const generalSettingsColumns = db.prepare('PRAGMA table_info(general_settings)').all().map((c) => c.name);
 ['opening_bank_balance', 'opening_petty_cash_balance'].forEach((col) => {
   if (generalSettingsColumns.includes(col)) {

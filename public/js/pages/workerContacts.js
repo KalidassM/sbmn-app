@@ -8,8 +8,8 @@ window.WorkerContactsPage = {
       <div class="panel">
         <div class="panel-header"><h3>All Contacts</h3></div>
         <table>
-          <thead><tr><th>Name</th><th>Mobile No</th><th>Work Profession</th><th></th></tr></thead>
-          <tbody id="rows"><tr><td colspan="4">Loading…</td></tr></tbody>
+          <thead><tr><th>Name</th><th>Mobile No</th><th>Second No</th><th>Work Profession</th><th></th></tr></thead>
+          <tbody id="rows"><tr><td colspan="5">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -26,7 +26,7 @@ window.WorkerContactsPage = {
     const workers = await Api.get('/worker-contacts');
     const tbody = document.getElementById('rows');
     if (!workers.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="4">No contacts yet</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No contacts yet</td></tr>`;
       return;
     }
     tbody.innerHTML = workers
@@ -35,6 +35,7 @@ window.WorkerContactsPage = {
       <tr>
         <td>${Util.escapeHtml(w.name)}</td>
         <td>${Util.escapeHtml(w.mobile)}</td>
+        <td>${Util.escapeHtml(w.mobile2 || '-')}</td>
         <td>${Util.escapeHtml(w.profession)}</td>
         <td class="toolbar">
           <button class="small secondary" data-edit="${w.id}">Edit</button>
@@ -72,6 +73,7 @@ window.WorkerContactsPage = {
       <form id="workerForm">
         <div class="field"><label>Name</label><input id="f_name" required maxlength="80" value="${Util.escapeHtml(w?.name || '')}" /></div>
         <div class="field"><label>Mobile No</label><input id="f_mobile" type="tel" required maxlength="20" value="${Util.escapeHtml(w?.mobile || '')}" /></div>
+        <div class="field"><label>Second Mobile No (optional)</label><input id="f_mobile2" type="tel" maxlength="20" value="${Util.escapeHtml(w?.mobile2 || '')}" /></div>
         <div class="field"><label>Work Profession</label><input id="f_profession" required maxlength="60" placeholder="e.g. Plumber, Electrician" value="${Util.escapeHtml(w?.profession || '')}" /></div>
         <div class="toolbar mt-16">
           <button type="submit">${isEdit ? 'Save Changes' : 'Add Contact'}</button>
@@ -85,6 +87,7 @@ window.WorkerContactsPage = {
       const payload = {
         name: document.getElementById('f_name').value.trim(),
         mobile: document.getElementById('f_mobile').value.trim(),
+        mobile2: document.getElementById('f_mobile2').value.trim(),
         profession: document.getElementById('f_profession').value.trim(),
       };
       try {
