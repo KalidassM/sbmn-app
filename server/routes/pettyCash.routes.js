@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
-const { notifyExpenseAdded } = require('../utils/expenseNotify');
+const { notifyExpenseAdded, notifyPettyCashTopup } = require('../utils/expenseNotify');
 
 const router = express.Router();
 
@@ -64,7 +64,9 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     description: `Added ${row.type} of ₹${row.amount} - ${row.description}`,
   });
   if (row.expense_id) {
-    notifyExpenseAdded(db.prepare('SELECT * FROM expenses WHERE id = ?').get(row.expense_id));
+    notifyExpenseAdded(db.prepare('SELECT * FROM expenses WHERE id = ?').get(row.expense_id), req.user?.username);
+  } else if (row.type === 'topup') {
+    notifyPettyCashTopup(row, req.user?.username);
   }
   res.status(201).json({ transaction: row, summary: computeSummary() });
 });

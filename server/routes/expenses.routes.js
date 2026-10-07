@@ -43,7 +43,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     entityId: expense.id,
     description: `Added expense "${expense.title}" of ₹${expense.amount}`,
   });
-  notifyExpenseAdded(expense);
+  notifyExpenseAdded(expense, req.user?.username);
   res.status(201).json(expense);
 });
 

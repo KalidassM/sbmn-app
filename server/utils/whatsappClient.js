@@ -24,7 +24,31 @@ let status = 'disconnected'; // 'disconnected' | 'connecting' | 'qr' | 'connecte
 let latestQr = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
+let outageAlerted = false; // true once a "disconnected" email went out for the current outage
 const MAX_RECONNECT_DELAY_MS = 5 * 60 * 1000;
+
+// Recently sent messages, kept in memory so Baileys can re-send one when the recipient's phone
+// asks for it (it does so after failing to decrypt - otherwise the recipient is stuck on
+// "Waiting for this message. This may take a while"). Bounded so it can't grow forever.
+const sentMessages = new Map();
+const MAX_SENT_MESSAGES = 500;
+
+function rememberSent(sent) {
+  if (!sent?.key?.id || !sent.message) return;
+  sentMessages.set(sent.key.id, sent.message);
+  if (sentMessages.size > MAX_SENT_MESSAGES) sentMessages.delete(sentMessages.keys().next().value);
+}
+
+// Outgoing messages are sent one at a time with a short gap. Firing a burst to many numbers at
+// once (e.g. notifying every core member) makes encryption-session setup fail more often.
+const SEND_GAP_MS = 1500;
+let sendQueue = Promise.resolve();
+
+function enqueueSend(task) {
+  const run = sendQueue.then(task);
+  sendQueue = run.catch(() => {}).then(() => new Promise((resolve) => setTimeout(resolve, SEND_GAP_MS)));
+  return run;
+}
 
 // Emails the association's contact address the moment the linked WhatsApp session drops - the
 // admin might otherwise only find out because reminders/notifications quietly stopped going out.
@@ -49,6 +73,26 @@ async function notifyAdminOfDisconnect(reason) {
   }
 }
 
+// Emails the association's contact address once the session is back after an outage, so the
+// "disconnected" alert above is followed by a clear all-clear. Never throws.
+async function notifyAdminOfReconnect() {
+  try {
+    if (!isEmailConfigured()) return;
+    const settings = db.prepare('SELECT contact_email, app_name FROM general_settings WHERE id = 1').get();
+    const to = settings?.contact_email;
+    if (!to) return;
+    const appName = settings?.app_name || 'the Association';
+    await sendMail({
+      to,
+      subject: `${appName} - WhatsApp reconnected in ${baseUrl()}`,
+      html: `<p>The WhatsApp connection used for reminders and notifications on the ${appName} portal has reconnected automatically and is working again.</p>
+             <p>No action is needed.</p>`,
+    });
+  } catch (err) {
+    console.error('WhatsApp reconnect email failed:', err.message);
+  }
+}
+
 async function connect() {
   status = 'connecting';
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -58,6 +102,7 @@ async function connect() {
     version,
     auth: state,
     logger: pino({ level: 'silent' }),
+    getMessage: async (key) => sentMessages.get(key.id),
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -75,6 +120,10 @@ async function connect() {
       status = 'connected';
       reconnectAttempts = 0;
       console.log('WhatsApp linked and connected.');
+      if (outageAlerted) {
+        outageAlerted = false;
+        notifyAdminOfReconnect();
+      }
     } else if (connection === 'close') {
       status = 'disconnected';
       const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -83,12 +132,14 @@ async function connect() {
         console.log(`WhatsApp connection closed (${statusCode}). Logged out - clearing session.`);
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         reconnectAttempts = 0;
+        outageAlerted = false;
         notifyAdminOfDisconnect('been unlinked (logged out) - a fresh QR code scan is needed');
       } else {
         // Only alert on the first failure of a new outage, not on every retry - reconnectAttempts
         // is still 0 here the first time (it resets to 0 on a successful connect), so this fires
         // once per outage rather than spamming an email every few seconds while it keeps retrying.
         if (reconnectAttempts === 0) {
+          outageAlerted = true;
           notifyAdminOfDisconnect('disconnected unexpectedly and is attempting to reconnect automatically');
         }
         // Exponential backoff (5s, 10s, 20s... capped at 5min) - a fixed 5s retry would hammer
@@ -139,7 +190,7 @@ async function sendMessage(phone, text) {
   const jids = toWhatsAppJids(phone);
   if (!jids.length) throw new Error('No valid phone number on file');
   for (const jid of jids) {
-    await sock.sendMessage(jid, { text });
+    await enqueueSend(async () => rememberSent(await sock.sendMessage(jid, { text })));
   }
 }
 
@@ -158,7 +209,7 @@ async function listGroups() {
 async function sendToGroup(groupId, text) {
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   if (!groupId) throw new Error('No group selected');
-  await sock.sendMessage(groupId, { text });
+  await enqueueSend(async () => rememberSent(await sock.sendMessage(groupId, { text })));
 }
 
 function logout() {
