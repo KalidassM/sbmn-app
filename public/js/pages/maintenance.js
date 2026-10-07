@@ -95,11 +95,7 @@ window.MaintenancePage = {
 
   async loadDues() {
     const { month, year } = this.state;
-    let payments = await Api.get(`/maintenance/payments?month=${month}&year=${year}`);
-    const user = Api.getUser();
-    if (!Util.isAdmin(user) && user.member_id) {
-      payments = payments.filter((p) => p.member_id === user.member_id);
-    }
+    const payments = await Api.get(`/maintenance/payments?month=${month}&year=${year}`);
     this.currentPayments = payments;
     this.selectedIds.clear();
     this.renderSummary();
@@ -146,10 +142,15 @@ window.MaintenancePage = {
       const n = parseInt(siteNo, 10);
       return Number.isNaN(n) ? 0 : n;
     };
+    // Member users see their own row pinned to the top; admins keep the plain ordering.
+    const user = Api.getUser();
+    const pinMemberId = !Util.isAdmin(user) && user.member_id ? user.member_id : null;
+    const ownFirst = (p) => (pinMemberId && p.member_id === pinMemberId ? 0 : 1);
     return (filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter))
       .slice()
       .sort(
         (a, b) =>
+          ownFirst(a) - ownFirst(b) ||
           statusRank[a.status] - statusRank[b.status] ||
           siteNoNumericKey(a.site_no) - siteNoNumericKey(b.site_no) ||
           String(a.site_no || '').localeCompare(String(b.site_no || ''))
@@ -181,8 +182,6 @@ window.MaintenancePage = {
   },
 
   async fetchPaymentsForRange(pairs) {
-    const user = Api.getUser();
-    const isAdmin = Util.isAdmin(user);
     const filter = this.state.statusFilter;
     const statusRank = { paid: 0, partial: 1, unpaid: 1 };
     const siteNoNumericKey = (siteNo) => {
@@ -194,7 +193,6 @@ window.MaintenancePage = {
     const rows = [];
     pairs.forEach((p, idx) => {
       let payments = results[idx];
-      if (!isAdmin && user.member_id) payments = payments.filter((x) => x.member_id === user.member_id);
       if (filter !== 'all') payments = payments.filter((x) => x.status === filter);
       payments
         .slice()
