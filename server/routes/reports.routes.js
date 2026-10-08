@@ -54,8 +54,12 @@ router.get('/itr-summary', requireAuth, requireAdmin, (req, res) => {
 
   const expenseRows = db
     .prepare(
-      `SELECT id, title, category, amount, expense_date, source, notes
-       FROM expenses WHERE expense_date BETWEEN ? AND ? ORDER BY expense_date`
+      `SELECT e.id, e.title,
+              COALESCE(NULLIF(TRIM(e.category), ''), NULLIF(TRIM(t.category), ''),
+                       CASE WHEN e.source = 'petty_cash' THEN 'Petty Cash' END) AS category,
+              e.amount, e.expense_date, e.source, e.notes
+       FROM expenses e LEFT JOIN petty_cash_transactions t ON t.expense_id = e.id
+       WHERE e.expense_date BETWEEN ? AND ? ORDER BY e.expense_date`
     )
     .all(start, end);
 
