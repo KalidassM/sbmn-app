@@ -74,7 +74,7 @@ window.GeneralSettingsPage = {
       </form>
 
       <div class="panel">
-        <div class="panel-header"><h3>WhatsApp Reminders <span id="waBadge"></span></h3></div>
+        <div class="panel-header"><h3>Link WhatsApp  <span id="waBadge"></span></h3></div>
         <div id="waContent"></div>
       </div>
     `;

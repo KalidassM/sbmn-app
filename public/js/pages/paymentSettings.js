@@ -35,15 +35,6 @@ window.PaymentSettingsPage = {
           <div class="toolbar mt-16"><button type="submit">Save Gateway Settings</button></div>
         </form>
       </div>
-
-      <div class="panel">
-        <div class="panel-header"><h3>Preview</h3></div>
-        <div class="form-grid" style="align-items:start;">
-          <div class="field"><label>Test Amount (₹)</label><input id="previewAmount" type="number" value="500" /></div>
-          <div class="field"><button type="button" id="previewBtn" class="secondary" style="margin-top: 22px;">Show Sample QR</button></div>
-        </div>
-        <div id="previewBox"></div>
-      </div>
     `;
 
     const settings = await Api.get('/payment-settings');
@@ -93,21 +84,6 @@ window.PaymentSettingsPage = {
         this.showAlert('Gateway settings saved.', 'success');
       } catch (err) {
         this.showAlert(err.message);
-      }
-    });
-
-    document.getElementById('previewBtn').addEventListener('click', async () => {
-      const amount = Number(document.getElementById('previewAmount').value) || 0;
-      const box = document.getElementById('previewBox');
-      box.innerHTML = '<p class="text-muted">Loading QR…</p>';
-      try {
-        const data = await Api.get(`/payment-settings/qr?amount=${amount}&note=${encodeURIComponent('Sample payment')}`);
-        box.innerHTML = `
-          <img src="${data.qrDataUrl}" alt="UPI QR code" width="220" height="220" />
-          <p class="text-muted mt-16">Scan with any UPI app, or on a phone <a href="${Util.escapeHtml(data.upiUri)}">tap here to pay</a>.</p>
-        `;
-      } catch (err) {
-        box.innerHTML = `<div class="alert error">${Util.escapeHtml(err.message)}</div>`;
       }
     });
   },
