@@ -47,7 +47,7 @@ router.get('/itr-summary', requireAuth, requireAdmin, (req, res) => {
     .prepare(
       `SELECT d.id, d.member_id, COALESCE(m.name, d.donor_name) AS donor_name, d.amount, d.donation_date, d.purpose
        FROM donations d LEFT JOIN members m ON m.id = d.member_id
-       WHERE d.donation_date BETWEEN ? AND ?
+       WHERE d.donation_date BETWEEN ? AND ? AND d.gateway_status IS NOT 'unsettled'
        ORDER BY d.donation_date`
     )
     .all(start, end);

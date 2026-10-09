@@ -132,9 +132,14 @@ async function fetchReconDay(keyId, keySecret, date) {
 // Looks at Razorpay's settlement report for every day since the oldest unsettled online payment
 // and marks each due paid once its payment shows up in a settlement. Returns how many were settled.
 async function syncSettlements() {
-  const pending = db
-    .prepare("SELECT id, razorpay_payment_id, paid_date FROM maintenance_payments WHERE gateway_status = 'unsettled' AND razorpay_payment_id IS NOT NULL")
-    .all();
+  const pending = [
+    ...db
+      .prepare("SELECT id, razorpay_payment_id, paid_date FROM maintenance_payments WHERE gateway_status = 'unsettled' AND razorpay_payment_id IS NOT NULL")
+      .all(),
+    ...db
+      .prepare("SELECT id, razorpay_payment_id, donation_date AS paid_date FROM donations WHERE gateway_status = 'unsettled' AND razorpay_payment_id IS NOT NULL")
+      .all(),
+  ];
   if (!pending.length) return { checked: 0, settled: 0 };
   const settings = getGatewaySettings();
   if (!settings.razorpay_key_id || !settings.razorpay_key_secret) return { checked: pending.length, settled: 0 };
@@ -155,10 +160,16 @@ async function syncSettlements() {
      SET gateway_status = 'settled', status = 'paid', amount_paid = amount_due, settled_at = datetime('now'), settlement_id = ?
      WHERE razorpay_payment_id = ? AND gateway_status = 'unsettled'`
   );
+  const settleDonation = db.prepare(
+    `UPDATE donations
+     SET gateway_status = 'settled', status = 'completed', settled_at = datetime('now'), settlement_id = ?
+     WHERE razorpay_payment_id = ? AND gateway_status = 'unsettled'`
+  );
   let settled = 0;
   db.transaction(() =>
     settledByPayment.forEach((item, paymentId) => {
       settled += settle.run(item.settlement_id || null, paymentId).changes;
+      settled += settleDonation.run(item.settlement_id || null, paymentId).changes;
     })
   )();
   return { checked: pending.length, settled };

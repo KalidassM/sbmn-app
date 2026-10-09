@@ -7,6 +7,7 @@ window.DonationsPage = {
       <p class="page-sub">Track donations from members and well-wishers</p>
       <div id="alertBox"></div>
       ${isAdmin ? '<div class="panel" id="formPanel"></div>' : ''}
+      ${isAdmin ? '<div class="toolbar" style="margin-bottom:12px;"><button class="secondary" id="syncSettlementsBtn">Check Razorpay Settlements</button></div>' : ''}
       <div class="panel">
         <div class="panel-header"><h3>All Donations</h3><div class="text-muted" id="totalLabel"></div></div>
         <table>
@@ -18,8 +19,31 @@ window.DonationsPage = {
 
     this.members = await Api.get('/members');
     this.events = await Api.get('/events');
-    if (isAdmin) this.renderForm(document.getElementById('formPanel'), null);
+    if (isAdmin) {
+      this.renderForm(document.getElementById('formPanel'), null);
+      document.getElementById('syncSettlementsBtn').addEventListener('click', () => this.checkSettlements());
+    }
     await this.loadRows();
+  },
+
+  // Marks online donations completed once Razorpay has settled them to the bank
+  async checkSettlements() {
+    const btn = document.getElementById('syncSettlementsBtn');
+    btn.disabled = true;
+    try {
+      const result = await Api.post('/maintenance/sync-settlements', {});
+      await this.loadRows();
+      this.showAlert(
+        result.checked
+          ? `Checked ${result.checked} online payment(s) awaiting settlement - ${result.settled} now settled and marked paid.`
+          : 'No online payments are awaiting settlement.',
+        'success'
+      );
+    } catch (err) {
+      this.showAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
   },
 
   showAlert(message, type = 'error') {
@@ -48,7 +72,7 @@ window.DonationsPage = {
         <td>${Util.money(d.amount)}</td>
         <td>${Util.escapeHtml(d.purpose || '-')}</td>
         <td>${Util.escapeHtml(d.event_title || '-')}</td>
-        <td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.status}</span></td>
+        <td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.gateway_status === 'unsettled' ? 'Paid via Razorpay – settlement pending' : d.status}</span></td>
         ${
           isAdmin
             ? `<td class="toolbar">

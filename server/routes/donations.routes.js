@@ -118,6 +118,9 @@ function loadOwnDonation(donationId, user) {
   if (donation.status !== 'pending') {
     return { error: 400, message: 'This donation has already been completed' };
   }
+  if (donation.gateway_status === 'unsettled') {
+    return { error: 400, message: 'This donation was already paid online and is awaiting bank settlement' };
+  }
   return { donation };
 }
 
@@ -176,7 +179,7 @@ router.post('/self/:id/verify', requireAuth, (req, res) => {
   }
 
   db.prepare(
-    `UPDATE donations SET status = 'completed', razorpay_payment_id = ?, donation_date = date('now') WHERE id = ?`
+    `UPDATE donations SET gateway_status = 'unsettled', razorpay_payment_id = ?, donation_date = date('now') WHERE id = ?`
   ).run(razorpay_payment_id, donation.id);
 
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(donation.id);
@@ -198,7 +201,10 @@ router.put('/:id/confirm', requireAuth, requireAdmin, (req, res) => {
   if (existing.status !== 'pending') {
     return res.status(400).json({ error: 'This donation is already completed' });
   }
-  db.prepare("UPDATE donations SET status = 'completed', donation_date = date('now') WHERE id = ?").run(req.params.id);
+  db.prepare(
+    `UPDATE donations SET status = 'completed', donation_date = date('now'),
+       gateway_status = CASE WHEN gateway_status = 'unsettled' THEN 'settled' ELSE gateway_status END WHERE id = ?`
+  ).run(req.params.id);
   const row = db.prepare(`${SELECT_JOIN} WHERE d.id = ?`).get(req.params.id);
   notifyDonationWhatsApp(row);
   logActivity({

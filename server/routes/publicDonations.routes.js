@@ -114,8 +114,8 @@ router.post('/verify', async (req, res) => {
 
   const info = db
     .prepare(
-      `INSERT INTO donations (donor_name, donor_email, donor_phone, amount, purpose, status, source, razorpay_order_id, razorpay_payment_id)
-       VALUES (?, ?, ?, ?, ?, 'completed', 'public', ?, ?)`
+      `INSERT INTO donations (donor_name, donor_email, donor_phone, amount, purpose, status, gateway_status, source, razorpay_order_id, razorpay_payment_id)
+       VALUES (?, ?, ?, ?, ?, 'pending', 'unsettled', 'public', ?, ?)`
     )
     .run(
       name,
@@ -134,7 +134,7 @@ router.post('/verify', async (req, res) => {
     action: 'payment',
     entityType: 'donation',
     entityId: donation.id,
-    description: `${donation.donor_name} paid ₹${donation.amount} donation online${donation.purpose ? ` for ${donation.purpose}` : ''}`,
+    description: `${donation.donor_name} paid ₹${donation.amount} donation online${donation.purpose ? ` for ${donation.purpose}` : ''} - settlement pending`,
   });
   res.json({ ok: true });
 });

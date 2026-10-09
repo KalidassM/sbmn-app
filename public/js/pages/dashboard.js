@@ -92,7 +92,7 @@ window.DashboardPage = {
               recentDonations.length
                 ? recentDonations
                     .map(
-                      (d) => `<tr><td>${Util.formatDate(d.donation_date)}</td><td>${Util.escapeHtml(d.member_name || d.donor_name || '-')}</td><td>${Util.money(d.amount)}</td><td>${Util.escapeHtml(d.purpose || '-')}</td><td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.status}</span></td></tr>`
+                      (d) => `<tr><td>${Util.formatDate(d.donation_date)}</td><td>${Util.escapeHtml(d.member_name || d.donor_name || '-')}</td><td>${Util.money(d.amount)}</td><td>${Util.escapeHtml(d.purpose || '-')}</td><td><span class="badge ${d.status === 'pending' ? 'partial' : 'paid'}">${d.gateway_status === 'unsettled' ? 'Paid via Razorpay – settlement pending' : d.status}</span></td></tr>`
                     )
                     .join('')
                 : '<tr class="empty-row"><td colspan="5">No donations yet</td></tr>'

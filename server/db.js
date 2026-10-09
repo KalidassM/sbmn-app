@@ -326,6 +326,18 @@ if (!donationColumns.includes('razorpay_payment_id')) {
   db.exec('ALTER TABLE donations ADD COLUMN razorpay_payment_id TEXT');
 }
 
+// Migration: online donations are only counted once Razorpay settles them (same as maintenance dues):
+// until then status stays 'pending' with gateway_status = 'unsettled'
+[
+  ['gateway_status', 'TEXT'], // NULL (not tracked) | 'unsettled' | 'settled'
+  ['settled_at', 'TEXT'],
+  ['settlement_id', 'TEXT'],
+].forEach(([col, type]) => {
+  if (!donationColumns.includes(col)) {
+    db.exec(`ALTER TABLE donations ADD COLUMN ${col} ${type}`);
+  }
+});
+
 // Migration: committee directory photos on the public site (stored as base64 data URLs, no file storage needed)
 const coreMemberColumns = db.prepare('PRAGMA table_info(core_members)').all().map((c) => c.name);
 if (!coreMemberColumns.includes('photo')) {
