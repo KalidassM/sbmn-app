@@ -25,7 +25,14 @@ window.PaymentSettingsPage = {
             <div class="field"><label>Key ID</label><input id="s_rp_key_id" placeholder="rzp_live_xxxxxxxxxxxx" /></div>
             <div class="field"><label>Key Secret</label><input id="s_rp_key_secret" type="password" placeholder="Leave blank to keep existing" /></div>
           </div>
-          <div class="toolbar mt-16"><button type="submit">Save Gateway Keys</button></div>
+          <div class="form-grid mt-16">
+            <div class="field"><label>Gateway Fee (%)</label><input id="s_rp_fee" type="number" step="0.01" min="0" max="20" /></div>
+            <div class="field"><label>Same-day Settlement Fee (%)</label><input id="s_rp_settle" type="number" step="0.01" min="0" max="5" /></div>
+            <div class="field"><label>Gateway Fee Free Until (Razorpay free offer)</label><input id="s_rp_free" type="date" /></div>
+            <div class="field"><label>GST on Fee (%)</label><input id="s_rp_gst" type="number" step="0.01" min="0" max="50" /></div>
+          </div>
+          <p class="text-muted" style="font-size:0.85rem;">Members paying online are charged these fees plus GST on top of their maintenance, so the association receives the full amount. Until the "free until" date (e.g. while Razorpay's free-credits offer runs) the gateway fee is not charged to members; from the next day it is charged again automatically. Leave the date blank if there is no offer. Changes apply to new payments only.</p>
+          <div class="toolbar mt-16"><button type="submit">Save Gateway Settings</button></div>
         </form>
       </div>
 
@@ -46,6 +53,10 @@ window.PaymentSettingsPage = {
     document.getElementById('s_acct').value = settings.account_no || '';
     document.getElementById('s_ifsc').value = settings.ifsc_code || '';
     document.getElementById('s_rp_key_id').value = settings.razorpay_key_id || '';
+    document.getElementById('s_rp_fee').value = settings.gateway_fee_percent ?? 2;
+    document.getElementById('s_rp_settle').value = settings.gateway_settlement_fee_percent ?? 0.15;
+    document.getElementById('s_rp_free').value = settings.gateway_fee_free_until || '';
+    document.getElementById('s_rp_gst').value = settings.gateway_gst_percent ?? 18;
     this.renderGatewayStatus(settings.razorpay_configured);
 
     document.getElementById('settingsForm').addEventListener('submit', async (e) => {
@@ -70,12 +81,16 @@ window.PaymentSettingsPage = {
       const payload = {
         razorpay_key_id: document.getElementById('s_rp_key_id').value.trim(),
         razorpay_key_secret: document.getElementById('s_rp_key_secret').value.trim(),
+        gateway_fee_percent: document.getElementById('s_rp_fee').value.trim(),
+        gateway_settlement_fee_percent: document.getElementById('s_rp_settle').value.trim(),
+        gateway_fee_free_until: document.getElementById('s_rp_free').value,
+        gateway_gst_percent: document.getElementById('s_rp_gst').value.trim(),
       };
       try {
         const updated = await Api.put('/payment-settings', payload);
         document.getElementById('s_rp_key_secret').value = '';
         this.renderGatewayStatus(updated.razorpay_configured);
-        this.showAlert('Gateway keys saved.', 'success');
+        this.showAlert('Gateway settings saved.', 'success');
       } catch (err) {
         this.showAlert(err.message);
       }

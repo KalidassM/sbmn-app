@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
-const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
+const { getGatewaySettings, getRazorpayClient, verifySignature, computeCheckout, recordGatewayPayment } = require('../utils/razorpay');
 const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymentNotify');
 
 const router = express.Router();
@@ -15,6 +15,9 @@ function loadDue(paymentId, user) {
   }
   if (due.status === 'paid') {
     return { error: 400, message: 'This due is already fully paid' };
+  }
+  if (due.gateway_status === 'unsettled') {
+    return { error: 400, message: 'This due was already paid online and is awaiting bank settlement' };
   }
   return { due };
 }
@@ -44,6 +47,13 @@ router.get('/config', requireAuth, (req, res) => {
   });
 });
 
+// Fee breakdown shown before paying: what the member is charged so the association nets `amount`
+router.get('/quote', requireAuth, (req, res) => {
+  const amount = Number(req.query.amount);
+  if (!(amount > 0)) return res.status(400).json({ error: 'A valid amount is required' });
+  res.json(computeCheckout(amount));
+});
+
 router.post('/order', requireAuth, async (req, res) => {
   const client = getRazorpayClient();
   if (!client) {
@@ -54,7 +64,8 @@ router.post('/order', requireAuth, async (req, res) => {
   if (error) return res.status(error).json({ error: message });
 
   const remaining = dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
-  const amountPaise = Math.round(remaining * 100);
+  const checkout = computeCheckout(remaining);
+  const amountPaise = checkout.totalPaise;
 
   try {
     const order = await client.orders.create({
@@ -68,6 +79,7 @@ router.post('/order', requireAuth, async (req, res) => {
     const settings = getGatewaySettings();
     res.json({
       orderId: order.id,
+      checkout,
       amount: amountPaise,
       currency: order.currency,
       keyId: settings.razorpay_key_id,
@@ -79,7 +91,7 @@ router.post('/order', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/verify', requireAuth, (req, res) => {
+router.post('/verify', requireAuth, async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ error: 'Missing payment verification fields' });
@@ -101,32 +113,25 @@ router.post('/verify', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Payment signature verification failed' });
   }
 
-  const markPaid = db.prepare(
-    `UPDATE maintenance_payments
-     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), paid_at = datetime('now'), razorpay_payment_id = ?,
-         payment_mode = 'Razorpay', reference_no = ?
-     WHERE id = ?`
-  );
-  const updatedDues = db.transaction(() =>
-    dues.map((d) => {
-      markPaid.run(razorpay_payment_id, razorpay_payment_id, d.id);
-      return db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(d.id);
-    })
-  )();
+  const recorded = await recordGatewayPayment(dues, razorpay_order_id, razorpay_payment_id);
+  if (recorded.error) return res.status(400).json({ error: recorded.error });
+  const updatedDues = recorded.dues;
 
   const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updatedDues[0].member_id);
   updatedDues.forEach((updated) => {
-    notifyAdminOfPayment(updated);
     logActivity({
       actor: req.user?.username,
       action: 'payment',
       entityType: 'maintenance_payment',
       entityId: updated.id,
-      description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${updated.amount_paid} online for ${updated.month}/${updated.year}`,
+      description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid online via Razorpay for ${updated.month}/${updated.year} - awaiting settlement`,
     });
   });
-  notifyPaymentWhatsApp(updatedDues);
-  res.json({ ok: true, payments: updatedDues, payment: updatedDues[0] });
+  // The due isn't marked paid until settlement, so present it as received for the notifications
+  const received = updatedDues.map((d) => ({ ...d, amount_paid: d.amount_due, status: 'paid online - awaiting settlement' }));
+  received.forEach((d) => notifyAdminOfPayment(d));
+  notifyPaymentWhatsApp(received);
+  res.json({ ok: true, awaitingSettlement: true, payments: updatedDues, payment: updatedDues[0] });
 });
 
 module.exports = router;

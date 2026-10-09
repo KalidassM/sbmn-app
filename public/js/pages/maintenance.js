@@ -32,6 +32,7 @@ window.MaintenancePage = {
               <div style="gap: 16px;display: flex;">
                 ${isAdmin ? '<button id="recordPaymentBtn">Record Payment</button>' : ''}
                 ${isAdmin ? '<button class="secondary" id="bulkMarkPaidBtn">Mark Selected as Paid</button>' : ''}
+                ${isAdmin ? '<button class="secondary" id="syncSettlementsBtn">Check Razorpay Settlements</button>' : ''}
               </div>
               ${
                 isAdmin
@@ -70,9 +71,38 @@ window.MaintenancePage = {
       document.getElementById('exportDuesPdfBtn').addEventListener('click', () => this.showExportModal('pdf'));
       document.getElementById('recordPaymentBtn').addEventListener('click', () => this.showRecordPaymentModal());
       document.getElementById('bulkMarkPaidBtn').addEventListener('click', () => this.bulkMarkPaid());
+      document.getElementById('syncSettlementsBtn').addEventListener('click', () => this.checkSettlements());
     }
 
     await this.loadDues();
+  },
+
+  // An online (Razorpay) payment isn't marked paid until the money is settled to the bank
+  isAwaitingSettlement(p) {
+    return p.gateway_status === 'unsettled';
+  },
+
+  statusLabel(p) {
+    return this.isAwaitingSettlement(p) ? 'Paid via Razorpay – settlement pending' : p.status;
+  },
+
+  async checkSettlements() {
+    const btn = document.getElementById('syncSettlementsBtn');
+    btn.disabled = true;
+    try {
+      const result = await Api.post('/maintenance/sync-settlements', {});
+      await this.loadDues();
+      this.showAlert(
+        result.checked
+          ? `Checked ${result.checked} online payment(s) awaiting settlement - ${result.settled} now settled and marked paid.`
+          : 'No online payments are awaiting settlement.',
+        'success'
+      );
+    } catch (err) {
+      this.showAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
   },
 
   showAlert(message, type = 'error') {
@@ -233,7 +263,7 @@ window.MaintenancePage = {
         p.paid_date || '',
         p.payment_mode || '',
         p.reference_no || '',
-        p.status,
+        this.statusLabel(p),
       ]),
     ];
     Util.downloadCsv(`maintenance-dues-${this.getRangeLabel(startDate, endDate)}.csv`, rows);
@@ -257,7 +287,7 @@ window.MaintenancePage = {
       Util.formatDate(p.paid_date),
       p.payment_mode || '-',
       p.reference_no || '-',
-      p.status,
+      this.statusLabel(p),
     ]);
     Util.downloadPdf(`maintenance-dues-${this.getRangeLabel(startDate, endDate)}.pdf`, `Maintenance Dues - ${rangeTitle}`, columns, rows, { summary });
   },
@@ -381,7 +411,7 @@ window.MaintenancePage = {
         <td>${Util.formatDate(p.paid_date)}${p.paid_at ? `<br><span class="text-muted" style="font-size:0.78rem;">${Util.formatTime(p.paid_at)}</span>` : ''}</td>
         <td>${Util.escapeHtml(p.payment_mode || '-')}</td>
         <td>${Util.escapeHtml(p.reference_no || '-')}</td>
-        <td><span class="badge ${p.status}">${p.status}</span></td>
+        <td><span class="badge ${this.isAwaitingSettlement(p) ? 'partial' : p.status}">${Util.escapeHtml(this.statusLabel(p))}</span></td>
         ${
           isAdmin
             ? `<td class="toolbar">

@@ -12,14 +12,16 @@ window.DashboardPage = {
     ]);
     // members and committee (admin) members pay their own maintenance dues from here
     this.myDues = [];
+    this.myAwaiting = [];
     if (user.member_id) {
       const now = new Date();
       const currentKey = now.getFullYear() * 100 + (now.getMonth() + 1);
       // asking for the current month makes the server generate its dues if they don't exist yet
       await Api.get(`/maintenance/payments?month=${now.getMonth() + 1}&year=${now.getFullYear()}&member_id=${user.member_id}`);
       const all = await Api.get(`/maintenance/payments?member_id=${user.member_id}`);
+      this.myAwaiting = all.filter((p) => p.gateway_status === 'unsettled');
       this.myDues = all
-        .filter((p) => p.status !== 'paid' && p.year * 100 + p.month <= currentKey)
+        .filter((p) => p.status !== 'paid' && p.gateway_status !== 'unsettled' && p.year * 100 + p.month <= currentKey)
         .sort((a, b) => a.year * 100 + a.month - (b.year * 100 + b.month));
     }
 
@@ -48,6 +50,17 @@ window.DashboardPage = {
                   .join(' &middot; ')}</div>
               </div>
               <button id="payAllBtn">Pay ${Util.money(this.myDues.reduce((sum, p) => sum + Number(p.amount_due) - Number(p.amount_paid), 0))}</button>
+            </div>`
+          : ''
+      }
+
+      ${
+        this.myAwaiting.length
+          ? `<div class="panel">
+              <strong>Paid via Razorpay – settlement pending</strong>
+              <div class="text-muted" style="margin-top:4px;">${this.myAwaiting
+                .map((p) => `${Util.monthName(p.month)} ${p.year} (${Util.money(p.amount_due)})`)
+                .join(' &middot; ')} &mdash; your payment was received and will be marked paid once Razorpay settles it to the association's bank account.</div>
             </div>`
           : ''
       }
@@ -141,6 +154,9 @@ window.DashboardPage = {
       const config = await Api.get('/payments/razorpay/config');
       if (!config.configured) return this.showQr(label, remaining);
       const paymentIds = dues.map((d) => d.id);
+      const quote = await Api.get(`/payments/razorpay/quote?amount=${remaining}`);
+      const confirmed = await this.confirmOnlinePayment(label, quote);
+      if (!confirmed) return;
       const order = await Api.post('/payments/razorpay/order', { payment_ids: paymentIds });
       const rzp = new Razorpay({
         key: order.keyId,
@@ -158,7 +174,7 @@ window.DashboardPage = {
               razorpay_signature: response.razorpay_signature,
             });
             await this.render(document.getElementById('content').parentElement);
-            this.showAlert('Thank you! Your payment has been received.', 'success');
+            this.showAlert('Thank you! Your payment has been received. It will be marked paid once Razorpay settles it to the association.', 'success');
           } catch (err) {
             this.showAlert(err.message);
           }
@@ -169,6 +185,36 @@ window.DashboardPage = {
     } catch (err) {
       this.showAlert(err.message);
     }
+  },
+
+  // Shows the maintenance amount, Razorpay's fee + GST and the total charged, before checkout opens.
+  // Resolves true if the member chooses to continue.
+  confirmOnlinePayment(label, quote) {
+    return new Promise((resolve) => {
+      Util.openModal(`
+        <h3>Pay online</h3>
+        <p class="text-muted">Maintenance: ${Util.escapeHtml(label)}</p>
+        <table>
+          <tr><td>Maintenance amount</td><td style="text-align:right;">${Util.money(quote.net)}</td></tr>
+          <tr><td>${quote.feeWaived ? 'Payment gateway fee (free offer)' : `Payment gateway fee (${quote.feePercent}%)`}</td><td style="text-align:right;">${Util.money(quote.fee)}</td></tr>
+          ${quote.settlementFee ? `<tr><td>Same-day Settlement fee (${quote.settlementFeePercent}%)</td><td style="text-align:right;">${Util.money(quote.settlementFee)}</td></tr>` : ''}
+          <tr><td>GST on gateway fee (${quote.gstPercent}%)</td><td style="text-align:right;">${Util.money(quote.gst)}</td></tr>
+          <tr><td><strong>Total to pay</strong></td><td style="text-align:right;"><strong>${Util.money(quote.total)}</strong></td></tr>
+        </table>
+        <div class="toolbar mt-16">
+          <button id="confirmOnlinePay">Pay ${Util.money(quote.total)}</button>
+          <button class="secondary" id="cancelOnlinePay">Cancel</button>
+        </div>
+      `);
+      document.getElementById('confirmOnlinePay').addEventListener('click', () => {
+        Util.closeModal();
+        resolve(true);
+      });
+      document.getElementById('cancelOnlinePay').addEventListener('click', () => {
+        Util.closeModal();
+        resolve(false);
+      });
+    });
   },
 
   async showQr(label, remaining) {

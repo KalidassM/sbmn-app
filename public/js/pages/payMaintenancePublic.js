@@ -59,6 +59,7 @@
             <div class="panel" style="margin-top:16px;">
               <div class="panel-header"><h3>${escapeHtml(m.name)} <span class="text-muted" style="font-size:0.8rem;">(Site No ${escapeHtml(m.site_no || '-')})</span></h3></div>
               <p class="text-muted">No outstanding dues — you're all caught up. Thank you!</p>
+              ${settlingNote(m)}
               <a href="/" class="btn" style="display:block; text-align:center; text-decoration:none; margin-top:16px;">Back to Home</a>
             </div>`;
         }
@@ -75,6 +76,7 @@
               <button id="pay-btn-member-${m.member_id}">Pay Now</button>
             </div>
             <div id="member-pay-${m.member_id}"></div>
+            ${settlingNote(m)}
           </div>`;
       })
       .join('');
@@ -84,6 +86,12 @@
       const btn = document.getElementById(`pay-btn-member-${m.member_id}`);
       if (btn) btn.addEventListener('click', () => showPaymentStep(m));
     });
+  }
+
+  function settlingNote(m) {
+    if (!m.settling || !m.settling.length) return '';
+    const months = m.settling.map((d) => `${MONTH_NAMES[d.month]} ${d.year}`).join(', ');
+    return `<p class="text-muted" style="font-size:0.85rem;"><strong>Paid via Razorpay – settlement pending:</strong> ${escapeHtml(months)}. Your payment was received and will be marked paid once Razorpay settles it to the association's bank account.</p>`;
   }
 
   function duesRowHtml(d) {
@@ -111,8 +119,7 @@
       .then((config) => {
         const gatewayBox = document.getElementById(`gatewayContent-member-${m.member_id}`);
         if (config.configured) {
-          gatewayBox.innerHTML = `<button id="payOnlineBtn-member-${m.member_id}" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-          document.getElementById(`payOnlineBtn-member-${m.member_id}`).addEventListener('click', () => payWithRazorpay(m, remaining));
+          return showOnlineStep(m, remaining, gatewayBox);
         } else {
           loadQr(m, remaining);
         }
@@ -120,6 +127,22 @@
       .catch((err) => {
         document.getElementById(`gatewayContent-member-${m.member_id}`).innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
       });
+  }
+
+  // Shows the fee + GST breakdown and the total before the Pay button
+  async function showOnlineStep(m, remaining, gatewayBox) {
+    const q = await request(`/quote?amount=${remaining}`);
+    gatewayBox.innerHTML = `
+      <table style="width:100%; margin-bottom:12px;">
+        <tr><td>Maintenance amount</td><td style="text-align:right;">${money(q.net)}</td></tr>
+        <tr><td>${q.feeWaived ? 'Payment gateway fee (free offer)' : `Payment gateway fee (${q.feePercent}%)`}</td><td style="text-align:right;">${money(q.fee)}</td></tr>
+        ${q.settlementFee ? `<tr><td>Same-day Settlement fee (${q.settlementFeePercent}%)</td><td style="text-align:right;">${money(q.settlementFee)}</td></tr>` : ''}
+        <tr><td>GST on gateway fee (${q.gstPercent}%)</td><td style="text-align:right;">${money(q.gst)}</td></tr>
+        <tr><td><strong>Total to pay</strong></td><td style="text-align:right;"><strong>${money(q.total)}</strong></td></tr>
+      </table>
+      <button id="payOnlineBtn-member-${m.member_id}" style="width:100%;">Pay ${money(q.total)} Online (Card / UPI / NetBanking)</button>
+      <p class="text-muted" style="font-size:0.78rem;">To avoid the gateway fee, pay by UPI QR / cash and let a core member know.</p>`;
+    document.getElementById(`payOnlineBtn-member-${m.member_id}`).addEventListener('click', () => payWithRazorpay(m, remaining));
   }
 
   async function loadQr(m, remaining) {
@@ -166,9 +189,9 @@
             });
             m.dues.forEach((d) => {
               const row = document.getElementById(`due-row-${d.id}`);
-              if (row) row.innerHTML = `<div><strong>${MONTH_NAMES[d.month]} ${d.year}</strong><div class="text-muted">Paid — thank you! 🙏</div></div>`;
+              if (row) row.innerHTML = `<div><strong>${MONTH_NAMES[d.month]} ${d.year}</strong><div class="text-muted">Paid via Razorpay – settlement pending. Thank you! 🙏</div></div>`;
             });
-            document.getElementById(`member-total-${m.member_id}`).innerHTML = '<div class="text-muted">All dues settled — thank you! 🙏</div>';
+            document.getElementById(`member-total-${m.member_id}`).innerHTML = '<div class="text-muted">Payment received — it will be marked paid once Razorpay settles it to the association. Thank you! 🙏</div>';
             document.getElementById(`member-pay-${m.member_id}`).innerHTML = '';
             document.getElementById(`member-pay-${m.member_id}`).innerHTML += '<a href="/" class="btn" style="display:block; text-align:center; text-decoration:none; margin-top:16px;">Back to Home</a>';
           } catch (err) {
@@ -177,8 +200,9 @@
         },
         modal: {
           ondismiss: () => {
-            gatewayBox.innerHTML = `<button id="payOnlineBtn-member-${m.member_id}" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-            document.getElementById(`payOnlineBtn-member-${m.member_id}`).addEventListener('click', () => payWithRazorpay(m, remaining));
+            showOnlineStep(m, remaining, gatewayBox).catch((err) => {
+              gatewayBox.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
+            });
           },
         },
         theme: { color: '#2f6f4e' },

@@ -24,6 +24,7 @@ const userRoutes = require('./routes/users.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const paymentSettingsRoutes = require('./routes/paymentSettings.routes');
 const razorpayPaymentsRoutes = require('./routes/razorpayPayments.routes');
+const { syncSettlements } = require('./utils/razorpay');
 const pettyCashRoutes = require('./routes/pettyCash.routes');
 const publicDonationsRoutes = require('./routes/publicDonations.routes');
 const noticeRoutes = require('./routes/notices.routes');
@@ -108,5 +109,16 @@ async function checkDailyReminders() {
   }
 }
 
+async function checkSettlements() {
+  try {
+    const result = await syncSettlements();
+    if (result.settled) console.log(`Razorpay settlements: ${result.settled} of ${result.checked} online payment(s) marked paid`);
+  } catch (err) {
+    console.error('Razorpay settlement check failed:', err.message);
+  }
+}
+
 setInterval(checkDailyReminders, 5 * 60 * 1000);
+setInterval(checkSettlements, 60 * 60 * 1000);
+setTimeout(checkSettlements, 30 * 1000); // also shortly after startup, so a restart doesn't delay the first check
 checkDailyReminders();

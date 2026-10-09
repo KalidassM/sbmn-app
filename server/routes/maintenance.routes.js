@@ -5,6 +5,7 @@ const { logActivity } = require('../utils/activityLog');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
 const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymentNotify');
 const { sendDailyReminders } = require('../utils/maintenanceReminders');
+const { syncSettlements } = require('../utils/razorpay');
 
 const router = express.Router();
 
@@ -52,7 +53,8 @@ router.post('/payments/bulk-mark-paid', requireAuth, requireAdmin, (req, res) =>
   const today = new Date().toISOString().slice(0, 10);
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const update = db.prepare(
-    `UPDATE maintenance_payments SET amount_paid = amount_due, status = 'paid', paid_date = ?, paid_at = ? WHERE id = ? AND status != 'paid'`
+    `UPDATE maintenance_payments SET amount_paid = amount_due, status = 'paid', paid_date = ?, paid_at = ?,
+       gateway_status = CASE WHEN gateway_status = 'unsettled' THEN 'settled' ELSE gateway_status END WHERE id = ? AND status != 'paid'`
   );
   let updated = 0;
   db.transaction((rowIds) => {
@@ -72,6 +74,15 @@ router.post('/payments/bulk-mark-paid', requireAuth, requireAdmin, (req, res) =>
 // Admin-only view of who still owes for a month and whether the automated WhatsApp reminder
 // reached them - pre-filtered server-side (unlike /payments) since it's built to surface phone
 // numbers + delivery errors in bulk, which only the admin should see.
+// Checks Razorpay's settlement report and marks online payments paid once they've reached the bank
+router.post('/sync-settlements', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    res.json(await syncSettlements());
+  } catch (err) {
+    res.status(502).json({ error: `Could not check Razorpay settlements: ${err.message}` });
+  }
+});
+
 router.get('/reminders', requireAuth, requireAdmin, (req, res) => {
   const month = Number(req.query.month) || new Date().getMonth() + 1;
   const year = Number(req.query.year) || new Date().getFullYear();
@@ -114,8 +125,9 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
     else finalStatus = 'partial';
   }
   const becomingPaid = finalStatus === 'paid' && existing.status !== 'paid';
+  const gatewayStatus = becomingPaid && existing.gateway_status === 'unsettled' ? 'settled' : existing.gateway_status;
   db.prepare(
-    `UPDATE maintenance_payments SET amount_due = ?, amount_paid = ?, paid_date = ?, paid_at = ?, status = ?, payment_mode = ?, reference_no = ? WHERE id = ?`
+    `UPDATE maintenance_payments SET amount_due = ?, amount_paid = ?, paid_date = ?, paid_at = ?, status = ?, payment_mode = ?, reference_no = ?, gateway_status = ? WHERE id = ?`
   ).run(
     finalAmountDue,
     finalAmountPaid,
@@ -124,10 +136,12 @@ router.put('/payments/:id', requireAuth, requireAdmin, (req, res) => {
     finalStatus,
     payment_mode !== undefined ? payment_mode || null : existing.payment_mode,
     reference_no !== undefined ? reference_no || null : existing.reference_no,
+    gatewayStatus,
     req.params.id
   );
   const row = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(req.params.id);
-  if (finalAmountPaid > existing.amount_paid) {
+  // an online payment already notified at checkout - don't re-notify when it's marked settled
+  if (finalAmountPaid > existing.amount_paid && existing.gateway_status !== 'unsettled') {
     notifyAdminOfPayment(row);
     notifyPaymentWhatsApp([row]);
   }

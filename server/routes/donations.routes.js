@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
+const { getGatewaySettings, getRazorpayClient, verifySignature, computeCheckout } = require('../utils/razorpay');
 const { logActivity } = require('../utils/activityLog');
 const { notifyDonationWhatsApp } = require('../utils/paymentNotify');
 
@@ -129,7 +129,8 @@ router.post('/self/:id/order', requireAuth, async (req, res) => {
   const { donation, error, message } = loadOwnDonation(req.params.id, req.user);
   if (error) return res.status(error).json({ error: message });
 
-  const amountPaise = Math.round(Number(donation.amount) * 100);
+  const checkout = computeCheckout(Number(donation.amount));
+  const amountPaise = checkout.totalPaise;
   try {
     const order = await client.orders.create({
       amount: amountPaise,
@@ -141,6 +142,7 @@ router.post('/self/:id/order', requireAuth, async (req, res) => {
     const settings = getGatewaySettings();
     res.json({
       orderId: order.id,
+      checkout,
       amount: amountPaise,
       currency: order.currency,
       keyId: settings.razorpay_key_id,

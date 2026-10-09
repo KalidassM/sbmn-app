@@ -50,8 +50,7 @@
       .then((config) => {
         const gatewayBox = document.getElementById('gatewayContent');
         if (config.configured) {
-          gatewayBox.innerHTML = `<button id="payOnlineBtn" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-          document.getElementById('payOnlineBtn').addEventListener('click', () => payWithRazorpay(donation));
+          return showOnlineStep(donation, gatewayBox);
         } else {
           loadQr(donation);
         }
@@ -59,6 +58,22 @@
       .catch((err) => {
         document.getElementById('gatewayContent').innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
       });
+  }
+
+  // Shows the fee + GST breakdown and the total before the Pay button
+  async function showOnlineStep(donation, gatewayBox) {
+    const q = await request(`/quote?amount=${donation.amount}`);
+    gatewayBox.innerHTML = `
+      <table style="width:100%; margin-bottom:12px;">
+        <tr><td>Donation amount</td><td style="text-align:right;">${money(q.net)}</td></tr>
+        <tr><td>${q.feeWaived ? 'Payment gateway fee (free offer)' : `Payment gateway fee (${q.feePercent}%)`}</td><td style="text-align:right;">${money(q.fee)}</td></tr>
+        ${q.settlementFee ? `<tr><td>Same-day settlement fee (${q.settlementFeePercent}%)</td><td style="text-align:right;">${money(q.settlementFee)}</td></tr>` : ''}
+        <tr><td>GST on fees (${q.gstPercent}%)</td><td style="text-align:right;">${money(q.gst)}</td></tr>
+        <tr><td><strong>Total to pay</strong></td><td style="text-align:right;"><strong>${money(q.total)}</strong></td></tr>
+      </table>
+      <button id="payOnlineBtn" style="width:100%;">Pay ${money(q.total)} Online (Card / UPI / NetBanking)</button>
+      <p class="text-muted" style="font-size:0.78rem;">The fees are only to cover the payment gateway, so your full donation reaches the association. To avoid them, pay by UPI QR instead and let a core member know.</p>`;
+    document.getElementById('payOnlineBtn').addEventListener('click', () => payWithRazorpay(donation));
   }
 
   async function loadQr(donation) {
@@ -119,8 +134,9 @@
         },
         modal: {
           ondismiss: () => {
-            gatewayBox.innerHTML = `<button id="payOnlineBtn" style="width:100%;">Pay Online Now (Card / UPI / NetBanking)</button>`;
-            document.getElementById('payOnlineBtn').addEventListener('click', () => payWithRazorpay(donation));
+            showOnlineStep(donation, gatewayBox).catch((err) => {
+              gatewayBox.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
+            });
           },
         },
         theme: { color: '#2f6f4e' },

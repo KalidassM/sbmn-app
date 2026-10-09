@@ -273,6 +273,32 @@ if (!maintenancePaymentColumns.includes('paid_at')) {
   db.exec('ALTER TABLE maintenance_payments ADD COLUMN paid_at TEXT');
 }
 
+// Migration: Razorpay gateway fee pass-through + settlement tracking. A due paid online is only
+// marked 'paid' once Razorpay settles it to the bank: until then gateway_status = 'unsettled'
+// (status stays 'unpaid' - the status CHECK constraint can't take a new value without a rebuild).
+[
+  ['gateway_status', 'TEXT'], // NULL (not an online payment) | 'unsettled' | 'settled'
+  ['gateway_fee', 'REAL'], // fee + GST the member paid on top, this due's share
+  ['settled_at', 'TEXT'],
+  ['settlement_id', 'TEXT'],
+].forEach(([col, type]) => {
+  if (!maintenancePaymentColumns.includes(col)) {
+    db.exec(`ALTER TABLE maintenance_payments ADD COLUMN ${col} ${type}`);
+  }
+});
+if (!paymentSettingsColumns.includes('gateway_fee_percent')) {
+  db.exec('ALTER TABLE payment_settings ADD COLUMN gateway_fee_percent REAL DEFAULT 2');
+}
+if (!paymentSettingsColumns.includes('gateway_settlement_fee_percent')) {
+  db.exec('ALTER TABLE payment_settings ADD COLUMN gateway_settlement_fee_percent REAL DEFAULT 0.15');
+}
+if (!paymentSettingsColumns.includes('gateway_fee_free_until')) {
+  db.exec('ALTER TABLE payment_settings ADD COLUMN gateway_fee_free_until TEXT');
+}
+if (!paymentSettingsColumns.includes('gateway_gst_percent')) {
+  db.exec('ALTER TABLE payment_settings ADD COLUMN gateway_gst_percent REAL DEFAULT 18');
+}
+
 // Migration: mark existing expenses as bank-sourced now that petty cash is a second source
 const expenseColumns = db.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name);
 if (!expenseColumns.includes('source')) {

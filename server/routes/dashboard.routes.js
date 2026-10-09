@@ -33,7 +33,7 @@ router.get('/summary', requireAuth, (req, res) => {
       `SELECT COALESCE(SUM(mp.amount_due - mp.amount_paid), 0) AS s
        FROM maintenance_payments mp
        JOIN members m ON m.id = mp.member_id
-       WHERE mp.status != 'paid' AND mp.month = ? AND mp.year = ? AND m.status = 'active'`
+       WHERE mp.status != 'paid' AND mp.gateway_status IS NOT 'unsettled' AND mp.month = ? AND mp.year = ? AND m.status = 'active'`
     )
     .get(now.getMonth() + 1, now.getFullYear()).s;
 

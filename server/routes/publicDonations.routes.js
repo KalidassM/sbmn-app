@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { logActivity } = require('../utils/activityLog');
 const { notifyDonationWhatsApp } = require('../utils/paymentNotify');
-const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
+const { getGatewaySettings, getRazorpayClient, verifySignature, computeCheckout } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
 
 const router = express.Router();
@@ -21,6 +21,13 @@ router.get('/razorpay-config', (req, res) => {
     configured: !!(settings.razorpay_key_id && settings.razorpay_key_secret),
     keyId: settings.razorpay_key_id || null,
   });
+});
+
+// Fee breakdown shown before paying: what the donor is charged so the association receives `amount`
+router.get('/quote', (req, res) => {
+  const amount = Number(req.query.amount);
+  if (!(amount > 0) || amount > MAX_AMOUNT) return res.status(400).json({ error: 'A valid amount is required' });
+  res.json(computeCheckout(amount));
 });
 
 router.get('/qr', async (req, res) => {
@@ -44,7 +51,8 @@ router.post('/order', async (req, res) => {
     return res.status(400).json({ error: 'A valid amount is required' });
   }
 
-  const amountPaise = Math.round(Number(amount) * 100);
+  const checkout = computeCheckout(Number(amount));
+  const amountPaise = checkout.totalPaise;
   try {
     // the donor details travel in the order notes; /verify reads them back from Razorpay
     const order = await client.orders.create({
@@ -53,6 +61,7 @@ router.post('/order', async (req, res) => {
       receipt: `donation_${Date.now()}`,
       notes: {
         donor_name: name,
+        donation_amount: String(checkout.net), // the donation itself; the order total also covers the gateway charges
         donor_email: clean(donor_email, 160),
         donor_phone: clean(donor_phone, 32),
         purpose: clean(purpose, 200),
@@ -61,6 +70,7 @@ router.post('/order', async (req, res) => {
     const settings = getGatewaySettings();
     res.json({
       orderId: order.id,
+      checkout,
       amount: amountPaise,
       currency: order.currency,
       keyId: settings.razorpay_key_id,
@@ -99,7 +109,8 @@ router.post('/verify', async (req, res) => {
   }
   const notes = order.notes || {};
   const name = clean(notes.donor_name, 120) || 'Well-wisher';
-  const amount = Number(order.amount) / 100;
+  // the order total includes the gateway charges the donor covered; the donation is the base amount
+  const amount = Number(notes.donation_amount) > 0 ? Number(notes.donation_amount) : Number(order.amount) / 100;
 
   const info = db
     .prepare(

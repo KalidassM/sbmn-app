@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { logActivity } = require('../utils/activityLog');
-const { getGatewaySettings, getRazorpayClient, verifySignature } = require('../utils/razorpay');
+const { getGatewaySettings, getRazorpayClient, verifySignature, computeCheckout, recordGatewayPayment } = require('../utils/razorpay');
 const { buildUpiQr } = require('../utils/upiQr');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
 const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymentNotify');
@@ -44,13 +44,19 @@ router.get('/dues', (req, res) => {
     const dues = db
       .prepare(
         `SELECT id, month, year, amount_due, amount_paid, status FROM maintenance_payments
-         WHERE member_id = ? AND status != 'paid'
+         WHERE member_id = ? AND status != 'paid' AND gateway_status IS NOT 'unsettled'
            AND (year > ? OR (year = ? AND month >= ?))
            AND (year < ? OR (year = ? AND month <= ?))
          ORDER BY year, month`
       )
       .all(m.id, OLDEST_PAYABLE_YEAR, OLDEST_PAYABLE_YEAR, OLDEST_PAYABLE_MONTH, currentYear, currentYear, currentMonth);
-    return { member_id: m.id, name: m.name, site_no: m.site_no, inactive: false, dues };
+    const settling = db
+      .prepare(
+        `SELECT id, month, year, amount_due FROM maintenance_payments
+         WHERE member_id = ? AND gateway_status = 'unsettled' ORDER BY year, month`
+      )
+      .all(m.id);
+    return { member_id: m.id, name: m.name, site_no: m.site_no, inactive: false, dues, settling };
   });
   res.json(results);
 });
@@ -61,6 +67,7 @@ function loadPendingDue(dueId) {
   const due = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(dueId);
   if (!due) return { error: 404, message: 'Due record not found' };
   if (due.status === 'paid') return { error: 400, message: 'This due is already fully paid' };
+  if (due.gateway_status === 'unsettled') return { error: 400, message: 'This due was already paid online and is awaiting bank settlement' };
   const member = db.prepare('SELECT status FROM members WHERE id = ?').get(due.member_id);
   if (member?.status !== 'active') return { error: 403, message: INACTIVE_MESSAGE };
   return { due };
@@ -74,6 +81,9 @@ function loadPendingDues(ids) {
   const dues = db.prepare(`SELECT * FROM maintenance_payments WHERE id IN (${placeholders})`).all(...ids);
   if (dues.length !== ids.length) return { error: 404, message: 'One or more due records not found' };
   if (dues.some((d) => d.status === 'paid')) return { error: 400, message: 'One or more dues are already fully paid' };
+  if (dues.some((d) => d.gateway_status === 'unsettled')) {
+    return { error: 400, message: 'One or more dues were already paid online and are awaiting bank settlement' };
+  }
   const memberId = dues[0].member_id;
   if (dues.some((d) => d.member_id !== memberId)) return { error: 400, message: 'Dues must belong to the same member' };
   const member = db.prepare('SELECT status FROM members WHERE id = ?').get(memberId);
@@ -87,6 +97,13 @@ router.get('/razorpay-config', (req, res) => {
     configured: !!(settings.razorpay_key_id && settings.razorpay_key_secret),
     keyId: settings.razorpay_key_id || null,
   });
+});
+
+// Fee breakdown shown before paying: what the member is charged so the association nets `amount`
+router.get('/quote', (req, res) => {
+  const amount = Number(req.query.amount);
+  if (!(amount > 0)) return res.status(400).json({ error: 'A valid amount is required' });
+  res.json(computeCheckout(amount));
 });
 
 router.get('/qr', async (req, res) => {
@@ -111,7 +128,8 @@ router.post('/pay-multiple/order', async (req, res) => {
   if (error) return res.status(error).json({ error: message });
 
   const remaining = dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
-  const amountPaise = Math.round(remaining * 100);
+  const checkout = computeCheckout(remaining);
+  const amountPaise = checkout.totalPaise;
   try {
     const order = await client.orders.create({
       amount: amountPaise,
@@ -124,6 +142,7 @@ router.post('/pay-multiple/order', async (req, res) => {
     const settings = getGatewaySettings();
     res.json({
       orderId: order.id,
+      checkout,
       amount: amountPaise,
       currency: order.currency,
       keyId: settings.razorpay_key_id,
@@ -135,7 +154,7 @@ router.post('/pay-multiple/order', async (req, res) => {
   }
 });
 
-router.post('/pay-multiple/verify', (req, res) => {
+router.post('/pay-multiple/verify', async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature, dueIds } = req.body || {};
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ error: 'Missing payment verification fields' });
@@ -157,27 +176,22 @@ router.post('/pay-multiple/verify', (req, res) => {
     return res.status(400).json({ error: 'Payment signature verification failed' });
   }
 
-  const markPaid = db.prepare(
-    `UPDATE maintenance_payments
-     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), paid_at = datetime('now'), razorpay_payment_id = ?,
-         payment_mode = 'Razorpay', reference_no = ?
-     WHERE id = ?`
-  );
-  db.transaction((rows) => rows.forEach((d) => markPaid.run(razorpay_payment_id, razorpay_payment_id, d.id)))(dues);
-
-  const updatedDues = dues.map((d) => db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(d.id));
-  updatedDues.forEach((updated) => notifyAdminOfPayment(updated));
-  notifyPaymentWhatsApp(updatedDues);
+  const recorded = await recordGatewayPayment(dues, razorpay_order_id, razorpay_payment_id);
+  if (recorded.error) return res.status(400).json({ error: recorded.error });
+  const updatedDues = recorded.dues;
+  // The dues aren't marked paid until settlement, so present them as received for the notifications
+  const received = updatedDues.map((d) => ({ ...d, amount_paid: d.amount_due, status: 'paid online - awaiting settlement' }));
+  received.forEach((updated) => notifyAdminOfPayment(updated));
+  notifyPaymentWhatsApp(received);
   const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(dues[0].member_id);
-  const total = dues.reduce((sum, d) => sum + (Number(d.amount_due) - Number(d.amount_paid)), 0);
   const months = dues.map((d) => `${d.month}/${d.year}`).join(', ');
   logActivity({
     actor: 'public',
     action: 'payment',
     entityType: 'maintenance_payment',
-    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${total} online for ${dues.length} month(s): ${months} (due ids: ${dues.map((d) => d.id).join(', ')})`,
+    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${recorded.checkout.net} online (plus ₹${(recorded.checkout.totalPaise - recorded.checkout.netPaise) / 100} gateway charges) for ${dues.length} month(s): ${months} - awaiting settlement (due ids: ${dues.map((d) => d.id).join(', ')})`,
   });
-  res.json({ ok: true });
+  res.json({ ok: true, awaitingSettlement: true });
 });
 
 router.post('/:id/order', async (req, res) => {
@@ -189,7 +203,8 @@ router.post('/:id/order', async (req, res) => {
   if (error) return res.status(error).json({ error: message });
 
   const remaining = Number(due.amount_due) - Number(due.amount_paid);
-  const amountPaise = Math.round(remaining * 100);
+  const checkout = computeCheckout(remaining);
+  const amountPaise = checkout.totalPaise;
   try {
     const order = await client.orders.create({
       amount: amountPaise,
@@ -201,6 +216,7 @@ router.post('/:id/order', async (req, res) => {
     const settings = getGatewaySettings();
     res.json({
       orderId: order.id,
+      checkout,
       amount: amountPaise,
       currency: order.currency,
       keyId: settings.razorpay_key_id,
@@ -212,7 +228,7 @@ router.post('/:id/order', async (req, res) => {
   }
 });
 
-router.post('/:id/verify', (req, res) => {
+router.post('/:id/verify', async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ error: 'Missing payment verification fields' });
@@ -233,25 +249,21 @@ router.post('/:id/verify', (req, res) => {
     return res.status(400).json({ error: 'Payment signature verification failed' });
   }
 
-  db.prepare(
-    `UPDATE maintenance_payments
-     SET amount_paid = amount_due, status = 'paid', paid_date = date('now'), paid_at = datetime('now'), razorpay_payment_id = ?,
-         payment_mode = 'Razorpay', reference_no = ?
-     WHERE id = ?`
-  ).run(razorpay_payment_id, razorpay_payment_id, due.id);
-
-  const updated = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?').get(due.id);
-  notifyAdminOfPayment(updated);
-  notifyPaymentWhatsApp([updated]);
+  const recorded = await recordGatewayPayment([due], razorpay_order_id, razorpay_payment_id);
+  if (recorded.error) return res.status(400).json({ error: recorded.error });
+  const updated = recorded.dues[0];
+  const received = { ...updated, amount_paid: updated.amount_due, status: 'paid online - awaiting settlement' };
+  notifyAdminOfPayment(received);
+  notifyPaymentWhatsApp([received]);
   const member = db.prepare('SELECT name, site_no FROM members WHERE id = ?').get(updated.member_id);
   logActivity({
     actor: 'public',
     action: 'payment',
     entityType: 'maintenance_payment',
     entityId: updated.id,
-    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${updated.amount_paid} online for ${updated.month}/${updated.year}`,
+    description: `${member?.name || 'Member'} (Site No ${member?.site_no || '-'}) paid ₹${recorded.checkout.net} online for ${updated.month}/${updated.year} - awaiting settlement`,
   });
-  res.json({ ok: true });
+  res.json({ ok: true, awaitingSettlement: true });
 });
 
 module.exports = router;
