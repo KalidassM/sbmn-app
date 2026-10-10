@@ -382,14 +382,20 @@ label {
 
 @media (max-width: 600px) {
   .main { padding: 16px; }
+  .main h1 { font-size: 1.8rem; }
   .form-grid { grid-template-columns: 1fr; }
   #monthSummary, #expenseSummary, #pettyCashStats { grid-template-columns: 1fr; }
   .panel { padding: 18px 12px; }
-  .panel-header { flex-direction: column; align-items: stretch; gap: 12px; }
-  .panel-header .toolbar { width: 100%; gap: 12px !important; }
-  .panel-header .toolbar div { flex-wrap: wrap; gap: 10px !important; width: 100%; }
-  .panel-header .toolbar select { flex: 1 1 0; min-width: 0; }
-  .panel-header .toolbar button { flex: 1 1 auto; }
+  .modal-box { padding: 18px; }
+
+  /* Headers and toolbars: stack, wrap, and let controls share the row */
+  .panel-header { flex-wrap: wrap; gap: 10px; }
+  .panel-header .toolbar, .panel-header .toolbar div { width: 100%; }
+  .toolbar, .toolbar div { flex-wrap: wrap !important; gap: 10px !important; }
+  .toolbar select, .toolbar input:not([type="radio"]):not([type="checkbox"]):not([type="file"]) { flex: 1 1 140px; min-width: 0; max-width: none !important; }
+  .panel-header .toolbar button, .panel-header .toolbar .btn { flex: 1 1 auto; }
+  td.toolbar { display: table-cell; white-space: nowrap; }
+  td.toolbar button { margin: 2px 4px 2px 0; }
 }
 
 input:disabled { background: #CCC; }
