@@ -383,6 +383,13 @@ label {
 @media (max-width: 600px) {
   .main { padding: 16px; }
   .form-grid { grid-template-columns: 1fr; }
+  #monthSummary, #expenseSummary, #pettyCashStats { grid-template-columns: 1fr; }
+  .panel { padding: 18px 12px; }
+  .panel-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .panel-header .toolbar { width: 100%; gap: 12px !important; }
+  .panel-header .toolbar div { flex-wrap: wrap; gap: 10px !important; width: 100%; }
+  .panel-header .toolbar select { flex: 1 1 0; min-width: 0; }
+  .panel-header .toolbar button { flex: 1 1 auto; }
 }
 
 input:disabled { background: #CCC; }
