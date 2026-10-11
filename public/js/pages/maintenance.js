@@ -1,5 +1,5 @@
 window.MaintenancePage = {
-  state: { month: new Date().getMonth() + 1, year: new Date().getFullYear(), statusFilter: 'all' },
+  state: { month: new Date().getMonth() + 1, year: new Date().getFullYear(), statusFilter: 'all', paidDateSort: '' },
   currentPayments: [],
   selectedIds: new Set(),
 
@@ -26,6 +26,11 @@ window.MaintenancePage = {
                 <option value="all">All</option>
                 <option value="unpaid">Unpaid</option>
                 <option value="paid">Paid</option>
+              </select>
+              <select id="paidDateSort" title="Sort by Paid Date">
+                <option value="">Paid Date: Default</option>
+                <option value="asc">Paid Date: Oldest first</option>
+                <option value="desc">Paid Date: Newest first</option>
               </select>
             </div>
             <div style="display: flex; gap: 16px; flex-wrap: wrap;">
@@ -64,6 +69,11 @@ window.MaintenancePage = {
     document.getElementById('statusFilter').value = this.state.statusFilter;
     document.getElementById('statusFilter').addEventListener('change', (e) => {
       this.state.statusFilter = e.target.value;
+      this.renderRows();
+    });
+    document.getElementById('paidDateSort').value = this.state.paidDateSort;
+    document.getElementById('paidDateSort').addEventListener('change', (e) => {
+      this.state.paidDateSort = e.target.value;
       this.renderRows();
     });
     if (isAdmin) {
@@ -176,11 +186,22 @@ window.MaintenancePage = {
     const user = Api.getUser();
     const pinMemberId = !Util.isAdmin(user) && user.member_id ? user.member_id : null;
     const ownFirst = (p) => (pinMemberId && p.member_id === pinMemberId ? 0 : 1);
+    // Paid Date sort: dues with no paid date always go last, whichever direction is chosen.
+    const dir = this.state.paidDateSort === 'asc' ? 1 : this.state.paidDateSort === 'desc' ? -1 : 0;
+    const paidKey = (p) => (p.paid_at || p.paid_date || '');
+    const paidDateOrder = (a, b) => {
+      if (!dir) return 0;
+      const ka = paidKey(a);
+      const kb = paidKey(b);
+      if (!ka || !kb) return (ka ? 0 : 1) - (kb ? 0 : 1);
+      return ka < kb ? -dir : ka > kb ? dir : 0;
+    };
     return (filter === 'all' ? this.currentPayments : this.currentPayments.filter((p) => p.status === filter))
       .slice()
       .sort(
         (a, b) =>
           ownFirst(a) - ownFirst(b) ||
+          paidDateOrder(a, b) ||
           statusRank[a.status] - statusRank[b.status] ||
           siteNoNumericKey(a.site_no) - siteNoNumericKey(b.site_no) ||
           String(a.site_no || '').localeCompare(String(b.site_no || ''))
