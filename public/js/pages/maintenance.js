@@ -188,7 +188,8 @@ window.MaintenancePage = {
     const ownFirst = (p) => (pinMemberId && p.member_id === pinMemberId ? 0 : 1);
     // Paid Date sort: dues with no paid date always go last, whichever direction is chosen.
     const dir = this.state.paidDateSort === 'asc' ? 1 : this.state.paidDateSort === 'desc' ? -1 : 0;
-    const paidKey = (p) => (p.paid_at || p.paid_date || '');
+    // paid_date first (what the column shows); paid_at only breaks ties within the same day
+    const paidKey = (p) => (p.paid_date ? `${p.paid_date} ${p.paid_at || ''}` : '');
     const paidDateOrder = (a, b) => {
       if (!dir) return 0;
       const ka = paidKey(a);
