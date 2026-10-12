@@ -23,15 +23,22 @@ function nowIST() {
   return { year: Number(map.year), month: Number(map.month), day: Number(map.day), hour: Number(map.hour), minute: Number(map.minute) };
 }
 
+function reminderLink(due) {
+  return `${baseUrl()}/p/${encodeURIComponent(due.site_no || due.name)}`;
+}
+
 function buildReminderMessage(due) {
   const remaining = Number(due.amount_due) - Number(due.amount_paid);
-  const link = `${baseUrl()}/p/${encodeURIComponent(due.site_no || due.name)}`;
   return (
     `*Hi ${due.name},*  This is a reminder that your maintenance due of *₹${remaining} ` +
     `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'})* is still pending.\n\n` +
-    `*Tap to pay online:*\n${link}\n\n` +
     signOff()
   );
+}
+
+// The pay link goes out as a tappable button rather than a bare URL in the text.
+function sendReminder(due) {
+  return whatsapp.sendMessageWithButton(due.phone, buildReminderMessage(due), { buttonText: 'Pay Now', url: reminderLink(due) });
 }
 
 // Sends the reminder for one due right now (admin's per-member button). Throws an Error with a
@@ -59,7 +66,7 @@ async function sendReminderForPayment(paymentId) {
     throw reminderError('No phone number on file for this member', 400);
   }
   try {
-    await whatsapp.sendMessage(due.phone, buildReminderMessage(due));
+    await sendReminder(due);
   } catch (err) {
     db.prepare('UPDATE maintenance_payments SET last_reminder_error = ? WHERE id = ?').run(err.message, due.id);
     console.error(`Reminder to ${due.name} (${due.phone}) failed:`, err.message);
@@ -127,9 +134,8 @@ async function sendDailyReminders({ force = false } = {}) {
       markFailed.run('No phone number on file', due.id);
       continue;
     }
-    const message = buildReminderMessage(due);
     try {
-      await whatsapp.sendMessage(due.phone, message);
+      await sendReminder(due);
       sent.push(due.name);
       markSent.run(due.id);
     } catch (err) {

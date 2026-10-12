@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
 const QRCode = require('qrcode');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, generateWAMessageFromContent, proto } = require('@whiskeysockets/baileys');
 const db = require('../db');
 const { sendMail, isConfigured: isEmailConfigured } = require('./mailer');
 const { baseUrl } = require('./appUrl');
@@ -194,6 +194,49 @@ async function sendMessage(phone, text) {
   }
 }
 
+// Sends `text` with a tappable call-to-action button (like the green "Website"/"Pay" button on
+// Business messages). Baileys has to build this "interactive" message by hand, and WhatsApp may
+// not render it for a non-Business linked account - so if the relay throws we fall back to plain
+// text with the link inline. (A silent drop on WhatsApp's side can't be detected from here.)
+async function sendMessageWithButton(phone, text, { buttonText, url }) {
+  if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
+  const jids = toWhatsAppJids(phone);
+  if (!jids.length) throw new Error('No valid phone number on file');
+  for (const jid of jids) {
+    await enqueueSend(async () => {
+      try {
+        const msg = generateWAMessageFromContent(
+          jid,
+          {
+            viewOnceMessage: {
+              message: {
+                messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+                interactiveMessage: proto.Message.InteractiveMessage.create({
+                  body: { text },
+                  nativeFlowMessage: {
+                    buttons: [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: buttonText, url, merchant_url: url }) }],
+                  },
+                }),
+              },
+            },
+          },
+          { userJid: sock.user.id }
+        );
+        await sock.relayMessage(jid, msg.message, {
+          messageId: msg.key.id,
+          additionalNodes: [
+            { tag: 'biz', attrs: {}, content: [{ tag: 'interactive', attrs: { type: 'native_flow', v: '1' }, content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }] }] },
+          ],
+        });
+        rememberSent(msg);
+      } catch (err) {
+        console.error('WhatsApp button message failed, falling back to plain text:', err.message);
+        rememberSent(await sock.sendMessage(jid, { text: `${text}\n\n${buttonText}: ${url}` }));
+      }
+    });
+  }
+}
+
 // Groups the linked admin account participates in - used to let the admin pick a specific
 // WhatsApp group to message from the portal, rather than only individual members.
 async function listGroups() {
@@ -227,4 +270,4 @@ function logout() {
   clearTimeout(reconnectTimer);
 }
 
-module.exports = { connect, getStatus, getQrDataUrl, isConnected, sendMessage, listGroups, sendToGroup, logout };
+module.exports = { connect, getStatus, getQrDataUrl, isConnected, sendMessage, sendMessageWithButton, listGroups, sendToGroup, logout };
