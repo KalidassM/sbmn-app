@@ -242,7 +242,7 @@ async function sendMessageWithButton(phone, text, { buttonText, url }) {
         rememberSent(msg);
       } catch (err) {
         console.error('WhatsApp button message failed, falling back to plain text:', err.message);
-        rememberSent(await sock.sendMessage(jid, { text: `${text}\n\n${buttonText}: ${url}` }));
+        rememberSent(await sock.sendMessage(jid, { text: text.includes(url) ? text : `${text}\n\n${buttonText}: ${url}` }));
       }
     });
   }
