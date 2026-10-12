@@ -76,9 +76,16 @@ window.DashboardPage = {
 
       <h3 class="stat-group-title">Finances</h3>
       <div class="stat-grid">
-        <div class="stat-card ${summary.balance < 0 ? 'negative' : ''}"><div class="label">Total Balance (Bank + Petty Cash + Donations)</div><div class="value">${Util.money(summary.balance)}</div></div>
-        <div class="stat-card"><div class="label">Maintenance Collected (this month)</div><div class="value">${Util.money(summary.maintenanceCollectedThisMonth)}</div></div>
-        <div class="stat-card ${summary.totalMaintenanceDue > 0 ? 'negative' : ''}"><div class="label">Maintenance Pending Due (this month)</div><div class="value">${Util.money(summary.totalMaintenanceDue)}</div></div>
+        <div class="stat-card ${summary.balance < 0 ? 'negative' : ''}">
+          <div class="label">Total Balance</div>
+          <div class="text-muted" style="font-size:1.2rem; margin-top:8px; line-height:1.6; color: var(--accent) !important;     font-weight: 700;">
+            <div style="display:flex; justify-content:space-between;"><span>Bank Balance</span><span>${Util.money(summary.bankBalance)}</span></div>
+            <div style="display:flex; justify-content:space-between;"><span>Petty Cash</span><span>${Util.money(summary.pettyCashBalance)}</span></div>
+          </div>
+          <div class="value" style="display: flex;justify-content: flex-end;">${Util.money(summary.balance)}</div>
+        </div>
+        <div class="stat-card"><div class="label">Maintenance Collected (${Util.monthName(summary.currentMonth)} ${summary.currentYear})</div><div class="value">${Util.money(summary.maintenanceCollectedThisMonth)}</div></div>
+        <div class="stat-card ${summary.totalMaintenanceDue > 0 ? 'negative' : ''}"><div class="label">Maintenance Pending Due (${Util.monthName(summary.currentMonth)} ${summary.currentYear})</div><div class="value">${Util.money(summary.totalMaintenanceDue)}</div></div>
         <div class="stat-card"><div class="label">Total Donations</div><div class="value">${Util.money(summary.totalDonations)}</div></div>
         <div class="stat-card"><div class="label">Total Expenses</div><div class="value">${Util.money(summary.totalExpenses)}</div></div>
       </div>
@@ -197,7 +204,7 @@ window.DashboardPage = {
         <table>
           <tr><td>Maintenance amount</td><td style="text-align:right;">${Util.money(quote.net)}</td></tr>
           <tr><td>${quote.feeWaived ? 'Payment gateway fee (free offer)' : `Payment gateway fee (${quote.feePercent}%)`}</td><td style="text-align:right;">${Util.money(quote.fee)}</td></tr>
-          ${quote.settlementFee ? `<tr><td>Same-day Settlement fee (${quote.settlementFeePercent}%)</td><td style="text-align:right;">${Util.money(quote.settlementFee)}</td></tr>` : ''}
+          ${quote.feeWaived && quote.sameDaySettlement ? `<tr><td>Same-day Settlement fee (free offer)</td><td style="text-align:right;">${Util.money(0)}</td></tr>` : quote.settlementFee ? `<tr><td>Same-day Settlement fee (${quote.settlementFeePercent}%)</td><td style="text-align:right;">${Util.money(quote.settlementFee)}</td></tr>` : ''}
           <tr><td>GST on gateway fee (${quote.gstPercent}%)</td><td style="text-align:right;">${Util.money(quote.gst)}</td></tr>
           <tr><td><strong>Total to pay</strong></td><td style="text-align:right;"><strong>${Util.money(quote.total)}</strong></td></tr>
         </table>

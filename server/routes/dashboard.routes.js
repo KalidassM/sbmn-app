@@ -39,6 +39,18 @@ router.get('/summary', requireAuth, (req, res) => {
 
   const balance = totalMaintenanceCollected + totalDonations - totalExpenses;
 
+  // Split of the total (they add back up to `balance`):
+  //   Bank       = maintenance + donations - bank expenses - money moved into petty cash
+  //   Petty Cash = top-ups - petty cash expenses
+  const pettyCashTopups = db
+    .prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM petty_cash_transactions WHERE type = 'topup'")
+    .get().s;
+  const pettyCashSpent = db
+    .prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM petty_cash_transactions WHERE type = 'expense'")
+    .get().s;
+  const pettyCashBalance = pettyCashTopups - pettyCashSpent;
+  const bankBalance = balance - pettyCashBalance;
+
   res.json({
     memberCount,
     inactiveMemberCount,
@@ -50,7 +62,12 @@ router.get('/summary', requireAuth, (req, res) => {
     totalMaintenanceCollected,
     maintenanceCollectedThisMonth,
     totalMaintenanceDue,
+    // the month the two "this month" figures above were calculated for
+    currentMonth: now.getMonth() + 1,
+    currentYear: now.getFullYear(),
     balance,
+    bankBalance,
+    pettyCashBalance,
   });
 });
 

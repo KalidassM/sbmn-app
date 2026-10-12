@@ -295,6 +295,9 @@ if (!paymentSettingsColumns.includes('gateway_settlement_fee_percent')) {
 if (!paymentSettingsColumns.includes('gateway_fee_free_until')) {
   db.exec('ALTER TABLE payment_settings ADD COLUMN gateway_fee_free_until TEXT');
 }
+if (!paymentSettingsColumns.includes('same_day_settlement_enabled')) {
+  db.exec('ALTER TABLE payment_settings ADD COLUMN same_day_settlement_enabled INTEGER DEFAULT 1');
+}
 if (!paymentSettingsColumns.includes('gateway_gst_percent')) {
   db.exec('ALTER TABLE payment_settings ADD COLUMN gateway_gst_percent REAL DEFAULT 18');
 }
