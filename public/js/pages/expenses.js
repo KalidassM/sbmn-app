@@ -18,12 +18,12 @@ window.ExpensesPage = {
   currentExpenses: [],
   currentTransactions: [],
   pettyCashSummary: { balance: 0, totalTopups: 0, totalExpenses: 0 },
-  filters: { year: '', category: '', from: '', to: '' },
+  filters: { year: '', category: '', source: '', from: '', to: '' },
 
   async render(container) {
     const user = Api.getUser();
     const isAdmin = Util.isAdmin(user);
-    this.filters = { year: '', category: '', from: '', to: '' };
+    this.filters = { year: '', category: '', source: '', from: '', to: '' };
 
     container.innerHTML = `
       <h1>Expenses & Petty Cash</h1>
@@ -39,6 +39,14 @@ window.ExpensesPage = {
           </div>
           <div class="field"><label>Category</label>
             <select id="filterCategory"><option value="">All Categories</option></select>
+          </div>
+          <div class="field"><label>Source</label>
+            <select id="filterSource">
+              <option value="">All Sources</option>
+              <option value="bank">Bank</option>
+              <option value="pc_expense">Petty Cash</option>
+              <option value="pc_topup">Petty Cash Top-up</option>
+            </select>
           </div>
           <div class="field"><label>From Date</label><input type="date" id="filterFrom" /></div>
           <div class="field"><label>To Date</label><input type="date" id="filterTo" /></div>
@@ -80,6 +88,11 @@ window.ExpensesPage = {
       this.renderSummary();
       this.renderEntries();
     });
+    document.getElementById('filterSource').addEventListener('change', (e) => {
+      this.filters.source = e.target.value;
+      this.renderSummary();
+      this.renderEntries();
+    });
     document.getElementById('filterFrom').addEventListener('change', (e) => {
       this.filters.from = e.target.value;
       this.renderSummary();
@@ -91,9 +104,10 @@ window.ExpensesPage = {
       this.renderEntries();
     });
     document.getElementById('clearFiltersBtn').addEventListener('click', () => {
-      this.filters = { year: '', category: '', from: '', to: '' };
+      this.filters = { year: '', category: '', source: '', from: '', to: '' };
       document.getElementById('filterYear').value = '';
       document.getElementById('filterCategory').value = '';
+      document.getElementById('filterSource').value = '';
       document.getElementById('filterFrom').value = '';
       document.getElementById('filterTo').value = '';
       this.renderSummary();
@@ -141,7 +155,8 @@ window.ExpensesPage = {
   },
 
   matchesFilters(entry) {
-    const { year, category, from, to } = this.filters;
+    const { year, category, source, from, to } = this.filters;
+    if (source && entry.kind !== source) return false;
     if (category && entry.category !== category) return false;
     if (year && !entry.date?.startsWith(year)) return false;
     if (from && entry.date < from) return false;
@@ -193,14 +208,13 @@ window.ExpensesPage = {
   },
 
   getFilterSuffix() {
-    const { year, category, from, to } = this.filters;
-    const cat = category ? `-${category.replace(/\W+/g, '_')}` : '';
-    if (year) return cat + `-${year}`;
-    if (from || to) return cat + `-${from || 'start'}_to_${to || 'end'}`;
-    if (cat) return cat;
-    if (year) return `-${year}`;
-    if (from || to) return `-${from || 'start'}_to_${to || 'end'}`;
-    return '';
+    const { year, category, source, from, to } = this.filters;
+    const parts = [];
+    if (source) parts.push(source);
+    if (category) parts.push(category.replace(/\W+/g, '_'));
+    if (year) parts.push(year);
+    else if (from || to) parts.push(`${from || 'start'}_to_${to || 'end'}`);
+    return parts.length ? `-${parts.join('-')}` : '';
   },
 
   exportEntriesCsv() {
@@ -242,7 +256,7 @@ window.ExpensesPage = {
     const bankTotal = filtered.filter((e) => e.kind === 'bank').reduce((sum, e) => sum + Number(e.amount), 0);
     const pettyCashExpenseTotal = filtered.filter((e) => e.kind === 'pc_expense').reduce((sum, e) => sum + Number(e.amount), 0);
     const topupTotal = filtered.filter((e) => e.kind === 'pc_topup').reduce((sum, e) => sum + Number(e.amount), 0);
-    const hasFilter = Boolean(this.filters.year || this.filters.category || this.filters.from || this.filters.to);
+    const hasFilter = Boolean(this.filters.year || this.filters.category || this.filters.source || this.filters.from || this.filters.to);
     return { bankTotal, pettyCashExpenseTotal, topupTotal, balance: this.pettyCashSummary.balance, hasFilter };
   },
 

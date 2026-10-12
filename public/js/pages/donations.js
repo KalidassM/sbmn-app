@@ -9,7 +9,7 @@ window.DonationsPage = {
       ${isAdmin ? '<div class="panel" id="formPanel"></div>' : ''}
       ${isAdmin ? '<div class="toolbar" style="margin-bottom:12px;"><button class="secondary" id="syncSettlementsBtn">Check Razorpay Settlements</button></div>' : ''}
       <div class="panel">
-        <div class="panel-header"><h3>All Donations</h3><div class="text-muted" id="totalLabel"></div></div>
+        <div class="panel-header"><h3>All Donations</h3><div class="text-muted" id="totalLabel" style="font-size: 30px; font-weight: 700; color: #198754 !important;"></div></div>
         <table>
           <thead><tr><th>Date</th><th>Donor</th><th>Amount</th><th>Purpose</th><th>Event</th><th>Status</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
           <tbody id="rows"><tr><td colspan="7">Loading…</td></tr></tbody>

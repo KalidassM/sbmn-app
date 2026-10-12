@@ -22,19 +22,28 @@ function verifySignature(orderId, paymentId, signature, secret) {
 function getFeeConfig() {
   const s =
     db
-      .prepare('SELECT gateway_fee_percent, gateway_settlement_fee_percent, gateway_gst_percent, gateway_fee_free_until FROM payment_settings WHERE id = 1')
+      .prepare('SELECT gateway_fee_percent, gateway_settlement_fee_percent, gateway_gst_percent, gateway_fee_free_until, same_day_settlement_enabled FROM payment_settings WHERE id = 1')
       .get() || {};
   return {
     feePercent: s.gateway_fee_percent ?? 2,
     settlementFeePercent: s.gateway_settlement_fee_percent ?? 0,
     gstPercent: s.gateway_gst_percent ?? 18,
     feeFreeUntil: s.gateway_fee_free_until || null,
+    sameDaySettlement: s.same_day_settlement_enabled !== 0,
   };
 }
 
-// Today's date in India, as YYYY-MM-DD (the server itself may run in UTC)
-function todayIST() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+// Current India time as YYYY-MM-DDTHH:mm:ss (the server itself may run in UTC)
+function nowIST() {
+  return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T');
+}
+
+// The free offer is stored as an IST date-time (YYYY-MM-DDTHH:mm); an older date-only value
+// means the end of that day. The offer runs through the end of the stored minute.
+function isFreeOfferActive(freeUntil) {
+  if (!freeUntil) return false;
+  const until = freeUntil.length <= 10 ? `${freeUntil}T23:59:59` : `${freeUntil.slice(0, 16)}:59`;
+  return nowIST() <= until;
 }
 
 // Grosses the amount up so that after Razorpay deducts its fees (the gateway fee and the same-day
@@ -42,11 +51,13 @@ function todayIST() {
 // `netRupees`. All maths is in whole paise.
 function computeCheckout(netRupees) {
   const config = getFeeConfig();
-  const { settlementFeePercent, gstPercent } = config;
-  // Razorpay's free-credits offer: while it runs the gateway fee isn't charged to the association,
-  // so it isn't passed on to members either (the same-day settlement fee still is)
-  const feeWaived = !!config.feeFreeUntil && todayIST() <= config.feeFreeUntil;
+  const { gstPercent } = config;
+  // Razorpay's free-credits offer: while it runs neither the gateway fee nor the same-day
+  // settlement fee is charged to the association, so neither is passed on to members
+  const feeWaived = isFreeOfferActive(config.feeFreeUntil);
   const feePercent = feeWaived ? 0 : config.feePercent;
+  // With same-day settlement switched off there is no settlement fee to pass on at all
+  const settlementFeePercent = !config.sameDaySettlement || feeWaived ? 0 : config.settlementFeePercent;
   const rate = (feePercent + settlementFeePercent) / 100;
   const gst = gstPercent / 100;
   const netPaise = Math.round(Number(netRupees) * 100);
@@ -60,7 +71,8 @@ function computeCheckout(netRupees) {
     feePercent: config.feePercent,
     feeWaived,
     feeFreeUntil: config.feeFreeUntil,
-    settlementFeePercent,
+    settlementFeePercent: config.settlementFeePercent,
+    sameDaySettlement: config.sameDaySettlement,
     gstPercent,
     netPaise,
     feePaise,

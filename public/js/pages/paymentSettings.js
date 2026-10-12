@@ -25,13 +25,20 @@ window.PaymentSettingsPage = {
             <div class="field"><label>Key ID</label><input id="s_rp_key_id" placeholder="rzp_live_xxxxxxxxxxxx" /></div>
             <div class="field"><label>Key Secret</label><input id="s_rp_key_secret" type="password" placeholder="Leave blank to keep existing" /></div>
           </div>
+          <div class="field mt-16">
+            <label class="toggle-switch">
+              <input type="checkbox" id="s_rp_sameday" />
+              <span class="toggle-track"></span>
+              Same-day settlement ON (turn off if you are not using it - no settlement fee is charged to members)
+            </label>
+          </div>
           <div class="form-grid mt-16">
             <div class="field"><label>Gateway Fee (%)</label><input id="s_rp_fee" type="number" step="0.01" min="0" max="20" /></div>
             <div class="field"><label>Same-day Settlement Fee (%)</label><input id="s_rp_settle" type="number" step="0.01" min="0" max="5" /></div>
-            <div class="field"><label>Gateway Fee Free Until (Razorpay free offer)</label><input id="s_rp_free" type="date" /></div>
+            <div class="field"><label>Gateway &amp; Settlement Fee Free Until (IST)</label><input id="s_rp_free" type="datetime-local" /></div>
             <div class="field"><label>GST on Fee (%)</label><input id="s_rp_gst" type="number" step="0.01" min="0" max="50" /></div>
           </div>
-          <p class="text-muted" style="font-size:0.85rem;">Members paying online are charged these fees plus GST on top of their maintenance, so the association receives the full amount. Until the "free until" date (e.g. while Razorpay's free-credits offer runs) the gateway fee is not charged to members; from the next day it is charged again automatically. Leave the date blank if there is no offer. Changes apply to new payments only.</p>
+          <p class="text-muted" style="font-size:0.85rem;">Members paying online are charged these fees plus GST on top of their maintenance, so the association receives the full amount. Until the "free until" time (e.g. while Razorpay's free-credits offer runs) the gateway fee and the same-day settlement fee are not charged to members; right after that date and time (India time, IST) they are charged again automatically. Leave the date blank if there is no offer. Changes apply to new payments only.</p>
           <div class="toolbar mt-16"><button type="submit">Save Gateway Settings</button></div>
         </form>
       </div>
@@ -46,7 +53,8 @@ window.PaymentSettingsPage = {
     document.getElementById('s_rp_key_id').value = settings.razorpay_key_id || '';
     document.getElementById('s_rp_fee').value = settings.gateway_fee_percent ?? 2;
     document.getElementById('s_rp_settle').value = settings.gateway_settlement_fee_percent ?? 0.15;
-    document.getElementById('s_rp_free').value = settings.gateway_fee_free_until || '';
+    document.getElementById('s_rp_free').value = (settings.gateway_fee_free_until || '').replace(/^(\d{4}-\d{2}-\d{2})$/, '$1T23:59');
+    document.getElementById('s_rp_sameday').checked = settings.same_day_settlement_enabled !== 0;
     document.getElementById('s_rp_gst').value = settings.gateway_gst_percent ?? 18;
     this.renderGatewayStatus(settings.razorpay_configured);
 
@@ -75,6 +83,7 @@ window.PaymentSettingsPage = {
         gateway_fee_percent: document.getElementById('s_rp_fee').value.trim(),
         gateway_settlement_fee_percent: document.getElementById('s_rp_settle').value.trim(),
         gateway_fee_free_until: document.getElementById('s_rp_free').value,
+        same_day_settlement_enabled: document.getElementById('s_rp_sameday').checked,
         gateway_gst_percent: document.getElementById('s_rp_gst').value.trim(),
       };
       try {

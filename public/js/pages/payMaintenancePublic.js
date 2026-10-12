@@ -136,12 +136,12 @@
       <table style="width:100%; margin-bottom:12px;">
         <tr><td>Maintenance amount</td><td style="text-align:right;">${money(q.net)}</td></tr>
         <tr><td>${q.feeWaived ? 'Payment gateway fee (free offer)' : `Payment gateway fee (${q.feePercent}%)`}</td><td style="text-align:right;">${money(q.fee)}</td></tr>
-        ${q.settlementFee ? `<tr><td>Same-day Settlement fee (${q.settlementFeePercent}%)</td><td style="text-align:right;">${money(q.settlementFee)}</td></tr>` : ''}
+        ${q.feeWaived && q.sameDaySettlement ? `<tr><td>Same-day Settlement fee (free offer)</td><td style="text-align:right;">${money(0)}</td></tr>` : q.settlementFee ? `<tr><td>Same-day Settlement fee (${q.settlementFeePercent}%)</td><td style="text-align:right;">${money(q.settlementFee)}</td></tr>` : ''}
         <tr><td>GST on gateway fee (${q.gstPercent}%)</td><td style="text-align:right;">${money(q.gst)}</td></tr>
         <tr><td><strong>Total to pay</strong></td><td style="text-align:right;"><strong>${money(q.total)}</strong></td></tr>
       </table>
       <button id="payOnlineBtn-member-${m.member_id}" style="width:100%;">Pay ${money(q.total)} Online (Card / UPI / NetBanking)</button>
-      <p class="text-muted" style="font-size:0.78rem;">To avoid the gateway fee, pay by UPI QR / cash and let a core member know.</p>`;
+      <p class="text-muted" style="font-size:0.78rem;"></p>`;
     document.getElementById(`payOnlineBtn-member-${m.member_id}`).addEventListener('click', () => payWithRazorpay(m, remaining));
   }
 
