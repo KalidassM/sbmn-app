@@ -4,7 +4,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
 const { ensureDuesGenerated } = require('../utils/maintenanceDues');
 const { notifyAdminOfPayment, notifyPaymentWhatsApp } = require('../utils/paymentNotify');
-const { sendDailyReminders } = require('../utils/maintenanceReminders');
+const { sendDailyReminders, sendReminderForPayment } = require('../utils/maintenanceReminders');
 const { syncSettlements } = require('../utils/razorpay');
 
 const router = express.Router();
@@ -90,7 +90,7 @@ router.get('/reminders', requireAuth, requireAdmin, (req, res) => {
 
   const rows = db
     .prepare(
-      `SELECT mp.id, mp.amount_due, mp.amount_paid, mp.status, mp.last_reminder_sent_at, mp.last_reminder_error,
+      `SELECT mp.id, mp.amount_due, mp.amount_paid, mp.status, mp.gateway_status, mp.last_reminder_sent_at, mp.last_reminder_error,
               m.name AS member_name, m.site_no, m.phone
        FROM maintenance_payments mp
        JOIN members m ON m.id = mp.member_id
@@ -109,6 +109,23 @@ router.post('/reminders/resend-today', requireAuth, requireAdmin, async (req, re
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Sends the reminder for a single member's due immediately
+router.post('/reminders/:id/send', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { name } = await sendReminderForPayment(Number(req.params.id));
+    logActivity({
+      actor: req.user?.username,
+      action: 'reminder',
+      entityType: 'maintenance',
+      entityId: Number(req.params.id),
+      description: `Sent maintenance reminder to ${name}`,
+    });
+    res.json({ ok: true, name });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 

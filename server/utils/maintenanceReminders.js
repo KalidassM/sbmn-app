@@ -23,6 +23,52 @@ function nowIST() {
   return { year: Number(map.year), month: Number(map.month), day: Number(map.day), hour: Number(map.hour), minute: Number(map.minute) };
 }
 
+function buildReminderMessage(due) {
+  const remaining = Number(due.amount_due) - Number(due.amount_paid);
+  const link = `${baseUrl()}/p/${encodeURIComponent(due.site_no || due.name)}`;
+  return (
+    `*Hi ${due.name},*  This is a reminder that your maintenance due of *₹${remaining} ` +
+    `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'})* is still pending.\n\n` +
+    `*Tap to pay online:*\n${link}\n\n` +
+    signOff()
+  );
+}
+
+// Sends the reminder for one due right now (admin's per-member button). Throws an Error with a
+// user-facing message when it can't be sent; records the outcome on the due like the daily run does.
+// `err.status` tells the route which HTTP status to use: 400 for a request that can't be sent as
+// asked, 503 when WhatsApp isn't linked/connected, 502 when WhatsApp itself failed or timed out.
+function reminderError(message, status) {
+  return Object.assign(new Error(message), { status });
+}
+
+async function sendReminderForPayment(paymentId) {
+  if (!whatsapp.isConnected()) throw reminderError('WhatsApp is not connected on this server. Open General Settings and link it (scan the QR code).', 503);
+  const due = db
+    .prepare(
+      `SELECT mp.id, mp.amount_due, mp.amount_paid, mp.month, mp.year, mp.status, mp.gateway_status, m.name, m.phone, m.site_no, m.status AS member_status
+       FROM maintenance_payments mp JOIN members m ON m.id = mp.member_id WHERE mp.id = ?`
+    )
+    .get(paymentId);
+  if (!due) throw reminderError('Due record not found', 404);
+  if (due.status === 'paid') throw reminderError('This due is already paid', 400);
+  if (due.gateway_status === 'unsettled') throw reminderError('This due was paid online and is awaiting bank settlement', 400);
+  if (due.member_status !== 'active') throw reminderError('This member is not active', 400);
+  if (!due.phone || !due.phone.replace(/\D/g, '')) {
+    db.prepare('UPDATE maintenance_payments SET last_reminder_error = ? WHERE id = ?').run('No phone number on file', due.id);
+    throw reminderError('No phone number on file for this member', 400);
+  }
+  try {
+    await whatsapp.sendMessage(due.phone, buildReminderMessage(due));
+  } catch (err) {
+    db.prepare('UPDATE maintenance_payments SET last_reminder_error = ? WHERE id = ?').run(err.message, due.id);
+    console.error(`Reminder to ${due.name} (${due.phone}) failed:`, err.message);
+    throw reminderError(`Could not send: ${err.message}. Check that WhatsApp is still linked in General Settings.`, 502);
+  }
+  db.prepare("UPDATE maintenance_payments SET last_reminder_sent_at = datetime('now'), last_reminder_error = NULL WHERE id = ?").run(due.id);
+  return { name: due.name };
+}
+
 async function sendDailyReminders({ force = false } = {}) {
   if (!whatsapp.isConnected()) {
     return { skipped: true, reason: 'WhatsApp is not linked yet. Scan the QR code in General Settings.' };
@@ -81,14 +127,7 @@ async function sendDailyReminders({ force = false } = {}) {
       markFailed.run('No phone number on file', due.id);
       continue;
     }
-    const remaining = Number(due.amount_due) - Number(due.amount_paid);
-    const link = `${baseUrl()}/pay-monthly-maintenance?q=${encodeURIComponent(due.site_no || due.name)}`;
-    
-    const message =
-      `*Hi ${due.name},*  This is a reminder that your maintenance due of *₹${remaining} ` +
-      `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'})* is still pending.\n\n` +
-      `*Pay Now:* ${link}\n\n` +
-      signOff();
+    const message = buildReminderMessage(due);
     try {
       await whatsapp.sendMessage(due.phone, message);
       sent.push(due.name);
@@ -104,4 +143,4 @@ async function sendDailyReminders({ force = false } = {}) {
   return { skipped: false, dateKey, totalDue: dues.length, sent, failed, skippedNoPhone };
 }
 
-module.exports = { sendDailyReminders };
+module.exports = { sendDailyReminders, sendReminderForPayment };

@@ -19,8 +19,8 @@ window.RemindersPage = {
           </div>
         </div>
         <table>
-          <thead><tr><th>Site No</th><th>Member</th><th>Phone</th><th>Amount Due</th><th>Status</th><th>Reminder</th></tr></thead>
-          <tbody id="reminderRows"><tr><td colspan="6">Loading…</td></tr></tbody>
+          <thead><tr><th>Site No</th><th>Member</th><th>Phone</th><th>Amount Due</th><th>Status</th><th>Reminder</th><th></th></tr></thead>
+          <tbody id="reminderRows"><tr><td colspan="7">Loading…</td></tr></tbody>
         </table>
       </div>
     `;
@@ -61,7 +61,10 @@ window.RemindersPage = {
 
   showAlert(message, type = 'error') {
     const box = document.getElementById('alertBox');
-    if (box) box.innerHTML = `<div class="alert ${type}">${Util.escapeHtml(message)}</div>`;
+    if (!box) return;
+    box.innerHTML = `<div class="alert ${type}">${Util.escapeHtml(message)}</div>`;
+    // the message box is at the top of the page, so bring it into view after a button lower down
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   },
 
   populateMonthYearSelects() {
@@ -89,7 +92,7 @@ window.RemindersPage = {
     }
 
     if (!members.length) {
-      rows.innerHTML = `<tr class="empty-row"><td colspan="6">Everyone has paid for ${Util.monthName(month)} ${year}.</td></tr>`;
+      rows.innerHTML = `<tr class="empty-row"><td colspan="7">Everyone has paid for ${Util.monthName(month)} ${year}.</td></tr>`;
       return;
     }
 
@@ -111,8 +114,30 @@ window.RemindersPage = {
           <td>${Util.money(remaining)}</td>
           <td><span class="badge ${m.status}">${m.status}</span></td>
           <td>${reminderCell}</td>
+          <td><button type="button" class="small secondary" data-send="${m.id}" data-name="${Util.escapeHtml(m.member_name)}" ${m.gateway_status === 'unsettled' ? 'disabled title="Paid online, awaiting settlement"' : ''}>Send Reminder</button></td>
         </tr>`;
       })
       .join('');
+
+    rows.querySelectorAll('[data-send]').forEach((btn) =>
+      btn.addEventListener('click', () => this.sendOne(btn))
+    );
+  },
+
+  async sendOne(btn) {
+    const name = btn.dataset.name;
+    if (!confirm(`Send a WhatsApp reminder to ${name} now?`)) return;
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = 'Sending…';
+    try {
+      await Api.post(`/maintenance/reminders/${btn.dataset.send}/send`);
+      this.showAlert(`Reminder sent to ${name}.`, 'success');
+      await this.load();
+    } catch (err) {
+      this.showAlert(err.message);
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   },
 };

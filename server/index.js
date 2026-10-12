@@ -76,9 +76,28 @@ app.get('/donate', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'donate.html'));
 });
 
-app.get('/pay-monthly-maintenance', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'pay-maintenance.html'));
-});
+// The pay page carries link-preview tags (shown as a card when the reminder link is shared on
+// WhatsApp), which need absolute URLs - so the page is served with them filled in.
+const fs = require('fs');
+const { baseUrl } = require('./utils/appUrl');
+function sendPayPage(req, res) {
+  const base = baseUrl();
+  const og = `<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Sri Balamurugan Nagar Welfare Association" />
+<meta property="og:title" content="Pay Monthly Maintenance" />
+<meta property="og:description" content="Tap to pay your monthly maintenance online - Sri Balamurugan Nagar Welfare Association" />
+<meta property="og:image" content="${base}/assets/sbmn-logo.png" />
+<meta property="og:url" content="${base}${req.path}" />
+<meta name="twitter:card" content="summary" />`;
+  fs.readFile(path.join(__dirname, '..', 'public', 'pay-maintenance.html'), 'utf8', (err, html) => {
+    if (err) return res.status(500).send('Page unavailable');
+    res.type('html').send(html.replace('<!--OG_TAGS-->', og));
+  });
+}
+
+app.get('/pay-monthly-maintenance', sendPayPage);
+// Short link used in WhatsApp reminders: /p/<site no or name>
+app.get('/p/:q', sendPayPage);
 
 // The member/admin portal (hash-routed SPA) lives at /portal; "/" is the public marketing site
 app.get('/portal', (req, res) => {

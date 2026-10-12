@@ -229,7 +229,8 @@
   });
 
   // Reminder links (?q=SITE_NO) pre-fill and auto-run the search so members don't have to type
-  const prefill = new URLSearchParams(window.location.search).get('q');
+  const shortLink = window.location.pathname.match(/^\/p\/(.+)$/);
+  const prefill = shortLink ? decodeURIComponent(shortLink[1]) : new URLSearchParams(window.location.search).get('q');
   if (prefill) {
     document.getElementById('q').value = prefill;
     runSearch(prefill);
