@@ -32,11 +32,13 @@ function buildReminderMessage(due) {
   return (
     `*Hi ${due.name},*  This is a reminder that your maintenance due of *₹${remaining} ` +
     `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'})* is still pending.\n\n` +
+    `*Tap to pay online:*\n${reminderLink(due)}\n\n` +
     signOff()
   );
 }
 
-// The pay link goes out as a tappable button rather than a bare URL in the text.
+// The pay link goes out both as a tappable button (phone) and inline in the text, because
+// WhatsApp Web/desktop can't render the button and would otherwise show no link at all.
 function sendReminder(due) {
   return whatsapp.sendMessageWithButton(due.phone, buildReminderMessage(due), { buttonText: 'Pay Now', url: reminderLink(due) });
 }
