@@ -95,6 +95,7 @@ async function notifyAdminOfReconnect() {
 
 async function connect() {
   status = 'connecting';
+  let sawQr = false;
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -113,6 +114,7 @@ async function connect() {
     if (qr) {
       latestQr = qr;
       status = 'qr';
+      sawQr = true;
     }
 
     if (connection === 'open') {
@@ -126,6 +128,7 @@ async function connect() {
       }
     } else if (connection === 'close') {
       status = 'disconnected';
+      latestQr = null;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
       if (loggedOut) {
@@ -134,6 +137,14 @@ async function connect() {
         reconnectAttempts = 0;
         outageAlerted = false;
         notifyAdminOfDisconnect('been unlinked (logged out) - a fresh QR code scan is needed');
+      } else if (sawQr || statusCode === DisconnectReason.restartRequired) {
+        // Not a real outage: an unscanned QR session times out (408) after about a minute, and
+        // right after a successful scan WhatsApp asks for a restart (515). Retry quickly with a
+        // fresh QR instead of growing the backoff, otherwise the page sits on "Connecting..."
+        // for up to 5 minutes between QR codes.
+        reconnectAttempts = 0;
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => connect().catch((err) => console.error('WhatsApp reconnect failed:', err.message)), 1000);
       } else {
         // Only alert on the first failure of a new outage, not on every retry - reconnectAttempts
         // is still 0 here the first time (it resets to 0 on a successful connect), so this fires
