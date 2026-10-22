@@ -1,3 +1,4 @@
+const path = require('path');
 const db = require('../db');
 const { ensureDuesGenerated } = require('./maintenanceDues');
 const whatsapp = require('./whatsappClient');
@@ -5,6 +6,8 @@ const { baseUrl } = require('./appUrl');
 const { signOff } = require('./memberNotify');
 
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const BANNER_PATH = path.join(__dirname, '..', '..', 'public', 'assets', 'reminder-banner.png');
 
 const DEFAULT_REMINDER_DAYS = '1,2,3,4,5,7,10';
 const DEFAULT_REMINDER_TIME = '10:00';
@@ -40,7 +43,7 @@ function buildReminderMessage(due) {
 // The pay link goes out both as a tappable button (phone) and inline in the text, because
 // WhatsApp Web/desktop can't render the button and would otherwise show no link at all.
 function sendReminder(due) {
-  return whatsapp.sendMessageWithButton(due.phone, buildReminderMessage(due), { buttonText: 'Pay Now', url: reminderLink(due) });
+  return whatsapp.sendMessageWithButton(due.phone, buildReminderMessage(due), { buttonText: 'Pay Now', url: reminderLink(due), imagePath: BANNER_PATH });
 }
 
 // Sends the reminder for one due right now (admin's per-member button). Throws an Error with a

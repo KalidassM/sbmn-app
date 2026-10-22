@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
 const QRCode = require('qrcode');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, generateWAMessageFromContent, proto } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, generateWAMessageFromContent, prepareWAMessageMedia, proto } = require('@whiskeysockets/baileys');
 const db = require('../db');
 const { sendMail, isConfigured: isEmailConfigured } = require('./mailer');
 const { baseUrl } = require('./appUrl');
@@ -209,13 +209,25 @@ async function sendMessage(phone, text) {
 // Business messages). Baileys has to build this "interactive" message by hand, and WhatsApp may
 // not render it for a non-Business linked account - so if the relay throws we fall back to plain
 // text with the link inline. (A silent drop on WhatsApp's side can't be detected from here.)
-async function sendMessageWithButton(phone, text, { buttonText, url }) {
+async function sendMessageWithButton(phone, text, { buttonText, url, imagePath }) {
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   const jids = toWhatsAppJids(phone);
   if (!jids.length) throw new Error('No valid phone number on file');
+  let image = null;
+  if (imagePath) {
+    try {
+      image = fs.readFileSync(imagePath);
+    } catch (err) {
+      console.error('WhatsApp banner image unreadable, sending without it:', err.message);
+    }
+  }
   for (const jid of jids) {
     await enqueueSend(async () => {
       try {
+        // Banner shown above the message body, like Business "payment reminder" messages.
+        const header = image
+          ? { hasMediaAttachment: true, ...(await prepareWAMessageMedia({ image }, { upload: sock.waUploadToServer })) }
+          : undefined;
         const msg = generateWAMessageFromContent(
           jid,
           {
@@ -223,6 +235,7 @@ async function sendMessageWithButton(phone, text, { buttonText, url }) {
               message: {
                 messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                 interactiveMessage: proto.Message.InteractiveMessage.create({
+                  header,
                   body: { text },
                   nativeFlowMessage: {
                     buttons: [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: buttonText, url, merchant_url: url }) }],
@@ -242,7 +255,8 @@ async function sendMessageWithButton(phone, text, { buttonText, url }) {
         rememberSent(msg);
       } catch (err) {
         console.error('WhatsApp button message failed, falling back to plain text:', err.message);
-        rememberSent(await sock.sendMessage(jid, { text: text.includes(url) ? text : `${text}\n\n${buttonText}: ${url}` }));
+        const plain = text.includes(url) ? text : `${text}\n\n${buttonText}: ${url}`;
+        rememberSent(await sock.sendMessage(jid, image ? { image, caption: plain } : { text: plain }));
       }
     });
   }
