@@ -19,5 +19,5 @@ const H = 630;
   await sharp(Buffer.from(svg))
     .composite([{ input: logo, left: W - 460 - 60, top: (H - 460) / 2 }])
     .png({ compressionLevel: 9 })
-    .toFile(path.join(ASSETS, 'reminder-banner.png'));
+    .toFile(path.join(ASSETS, 'reminder-banner.png')); 
 })();
