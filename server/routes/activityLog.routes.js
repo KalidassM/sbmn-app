@@ -10,4 +10,4 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   res.json(rows);
 });
 
-module.exports = router;
+module.exports = router; 
