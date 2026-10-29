@@ -43,20 +43,7 @@ const { sendDailyReminders } = require('./utils/maintenanceReminders');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const { rateLimit } = require('./middleware/rateLimit');
-app.set('trust proxy', 1); // behind Railway's proxy, so req.ip is the real client
-app.use((req, res, next) => {
-  res.set({
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'SAMEORIGIN',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Strict-Transport-Security': 'max-age=15552000',
-  });
-  next();
-});
 app.use(cors());
-const publicLimiter = rateLimit({ windowMs: 60 * 1000, max: 60 });
-app.use('/api/public', publicLimiter);
 app.use(express.json({ limit: '5mb' })); // raised to fit base64 committee-photo uploads
 
 app.use('/api/auth', authRoutes);
@@ -100,7 +87,7 @@ function sendPayPage(req, res) {
 <meta property="og:title" content="Pay Monthly Maintenance" />
 <meta property="og:description" content="Tap to pay your monthly maintenance online - Sri Balamurugan Nagar Welfare Association" />
 <meta property="og:image" content="${base}/assets/sbmn-logo.png" />
-<meta property="og:url" content="${base}${encodeURI(req.path).replace(/["<>&]/g, '')}" />
+<meta property="og:url" content="${base}${req.path}" />
 <meta name="twitter:card" content="summary" />`;
   fs.readFile(path.join(__dirname, '..', 'public', 'pay-maintenance.html'), 'utf8', (err, html) => {
     if (err) return res.status(500).send('Page unavailable');

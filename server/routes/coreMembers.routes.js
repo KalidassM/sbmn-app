@@ -6,9 +6,6 @@ const { ensureCoreMemberAccount } = require('../utils/coreMemberAccount');
 
 const router = express.Router();
 
-// Photos are stored as image data URLs; reject anything else (it is rendered into an <img src> on the public site)
-const validPhoto = (p) => p === undefined || p === null || p === '' || /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(p);
-
 const SELECT_JOIN = `
   SELECT cm.*, m.name AS member_name, m.phone AS member_phone, m.email AS member_email
   FROM core_members cm
@@ -22,7 +19,6 @@ router.get('/', requireAuth, (req, res) => {
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   const { member_id, designation, start_date, end_date, notes, photo } = req.body || {};
-  if (!validPhoto(photo)) return res.status(400).json({ error: 'Photo must be a PNG, JPEG, WebP or GIF image' });
   if (!member_id || !designation) {
     return res.status(400).json({ error: 'member_id and designation are required' });
   }
@@ -63,7 +59,6 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM core_members WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Core member record not found' });
   const { designation, start_date, end_date, notes, photo } = req.body || {};
-  if (!validPhoto(photo)) return res.status(400).json({ error: 'Photo must be a PNG, JPEG, WebP or GIF image' });
   db.prepare(
     `UPDATE core_members SET designation = ?, start_date = ?, end_date = ?, notes = ?, photo = ? WHERE id = ?`
   ).run(
