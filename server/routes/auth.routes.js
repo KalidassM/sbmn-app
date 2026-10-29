@@ -103,10 +103,10 @@ router.post('/forgot-password', (req, res) => {
 
   const settings = db.prepare('SELECT app_name FROM general_settings WHERE id = 1').get();
   const appName = settings?.app_name || 'the Association';
-  const text = `Your password reset code for ${appName} portal is: ${code}. It expires in ${RESET_CODE_TTL_MINUTES} minutes. If you did not request this, please ignore this message.\n\n${signOff()}`;
+  const text = `*Password reset code*\n\nYour code for the *${appName}* portal:\n\`\`\`${code}\`\`\`\n\n_This code expires in ${RESET_CODE_TTL_MINUTES} minutes. If you did not request it, please ignore this message._\n\n${signOff()}`;
 
   whatsapp
-    .sendMessage(phone, text)
+    .sendMessage(phone, text, { banner: 'reset' })
     .then(() => res.json({ ok: true }))
     .catch((err) => {
       console.error('Forgot-password WhatsApp send failed:', err.message);

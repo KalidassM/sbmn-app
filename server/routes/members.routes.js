@@ -75,7 +75,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
     entityId: member.id,
     description: `Added member ${member.name} (Site No ${member.site_no || '-'})`,
   });
-  await notifyMember(member, welcomeMessage(member));
+  await notifyMember(member, welcomeMessage(member), 'welcome');
   res.status(201).json(member);
 });
 

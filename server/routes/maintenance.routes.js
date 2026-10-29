@@ -57,9 +57,14 @@ router.post('/payments/bulk-mark-paid', requireAuth, requireAdmin, (req, res) =>
        gateway_status = CASE WHEN gateway_status = 'unsettled' THEN 'settled' ELSE gateway_status END WHERE id = ? AND status != 'paid'`
   );
   let updated = 0;
+  const changed = []; // dues that actually flipped to paid and weren't already notified at online checkout
+  const findDue = db.prepare('SELECT * FROM maintenance_payments WHERE id = ?');
   db.transaction((rowIds) => {
     rowIds.forEach((id) => {
-      updated += update.run(today, now, id).changes;
+      const before = findDue.get(id);
+      const n = update.run(today, now, id).changes;
+      updated += n;
+      if (n && before && before.gateway_status !== 'unsettled') changed.push(findDue.get(id));
     });
   })(ids);
   logActivity({
@@ -69,6 +74,13 @@ router.post('/payments/bulk-mark-paid', requireAuth, requireAdmin, (req, res) =>
     description: `Bulk marked ${updated} of ${ids.length} selected due(s) as paid (ids: ${ids.join(', ')})`,
   });
   res.json({ updated });
+
+  // Same confirmations as a single payment: the admin email per due, and one WhatsApp message per
+  // member covering all of their months in this batch (WhatsApp sends are queued, so a big batch is paced).
+  changed.forEach((due) => notifyAdminOfPayment(due));
+  const byMember = new Map();
+  changed.forEach((due) => byMember.set(due.member_id, [...(byMember.get(due.member_id) || []), due]));
+  byMember.forEach((dues) => notifyPaymentWhatsApp(dues));
 });
 
 // Admin-only view of who still owes for a month and whether the automated WhatsApp reminder

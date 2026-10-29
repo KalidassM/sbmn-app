@@ -52,13 +52,13 @@ async function notifyPaymentWhatsApp(dues) {
     const monthWord = dues.length > 1 ? `${dues.length} months` : '1 month';
 
     if (member.phone) {
-      const memberText = `Hi ${member.name}, your payment of ₹${totalPaid} for ${monthsText} has been received. Thank you!\n\n${signOff()}`;
-      whatsapp.sendMessage(member.phone, memberText).catch((err) => console.error('Payment WhatsApp to member failed:', err.message));
+      const memberText = `*Hi ${member.name},*\n\nYour payment of *₹${totalPaid}* for *${monthsText}* has been received. Thank you!\n\n${signOff()}`;
+      whatsapp.sendMessage(member.phone, memberText, { banner: 'payment' }).catch((err) => console.error('Payment WhatsApp to member failed:', err.message));
     }
 
     if (settings?.phone_number) {
-      const adminText = `Payment received: ₹${totalPaid} from ${member.name} (Site No ${member.site_no || '-'}) for ${monthsText} (${monthWord}).\n\n${signOff()}`;
-      whatsapp.sendMessage(settings.phone_number, adminText).catch((err) => console.error('Payment WhatsApp to admin failed:', err.message));
+      const adminText = `*Payment received*\n\n*Amount:* ₹${totalPaid}\n*From:* ${member.name} (Site No ${member.site_no || '-'})\n*For:* ${monthsText} (${monthWord})\n\n${signOff()}`;
+      whatsapp.sendMessage(settings.phone_number, adminText, { banner: 'payment' }).catch((err) => console.error('Payment WhatsApp to admin failed:', err.message));
     }
   } catch (err) {
     console.error('Payment WhatsApp notification failed:', err.message);
@@ -89,13 +89,13 @@ async function notifyDonationWhatsApp(donation) {
     const purposeText = donation.purpose ? ` for ${donation.purpose}` : '';
 
     if (donorPhone) {
-      const donorText = `Hi ${donorName}, thank you! Your donation of ₹${donation.amount}${purposeText} has been received.\n\n${signOff()}`;
-      whatsapp.sendMessage(donorPhone, donorText).catch((err) => console.error('Donation WhatsApp to donor failed:', err.message));
+      const donorText = `*Hi ${donorName},*\n\nThank you! Your donation of *₹${donation.amount}*${purposeText} has been received.\n\n${signOff()}`;
+      whatsapp.sendMessage(donorPhone, donorText, { banner: 'donation' }).catch((err) => console.error('Donation WhatsApp to donor failed:', err.message));
     }
 
     if (settings?.phone_number) {
-      const adminText = `Donation received: ₹${donation.amount} from ${donorName}${purposeText}.\n\n${signOff()}`;
-      whatsapp.sendMessage(settings.phone_number, adminText).catch((err) => console.error('Donation WhatsApp to admin failed:', err.message));
+      const adminText = `*Donation received*\n\n*Amount:* ₹${donation.amount}\n*From:* ${donorName}${purposeText ? `\n*For:* ${donation.purpose}` : ''}\n\n${signOff()}`;
+      whatsapp.sendMessage(settings.phone_number, adminText, { banner: 'donation' }).catch((err) => console.error('Donation WhatsApp to admin failed:', err.message));
     }
   } catch (err) {
     console.error('Donation WhatsApp notification failed:', err.message);

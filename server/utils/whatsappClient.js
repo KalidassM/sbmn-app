@@ -196,12 +196,56 @@ function toWhatsAppJids(phone) {
   return [...jids];
 }
 
-async function sendMessage(phone, text) {
+// Every outbound message carries a banner image, with the text as its caption. Each kind of message
+// has its own banner in public/assets/banners/<name>.png (welcome, account, reset, test, payment,
+// donation, expense, general - generate them with scripts/make-banners.js); a missing one falls back to
+// the reminder banner, and a missing/bad image falls back to plain text, so a banner problem never
+// stops a message (e.g. a password reset code) from being delivered.
+const ASSETS_DIR = path.join(__dirname, '..', '..', 'public', 'assets');
+const FALLBACK_BANNER = path.join(ASSETS_DIR, 'reminder-banner.png');
+const MAX_CAPTION = 1000;
+const bannerCache = new Map();
+
+function readBanner(name) {
+  const file = path.join(ASSETS_DIR, 'banners', `${String(name || 'general').replace(/[^a-z-]/gi, '')}.png`);
+  if (bannerCache.has(file)) return bannerCache.get(file);
+  let image = null;
+  for (const candidate of [file, FALLBACK_BANNER]) {
+    try {
+      image = fs.readFileSync(candidate);
+      break;
+    } catch (err) {
+      /* try the next one */
+    }
+  }
+  if (!image) console.error(`WhatsApp banner "${name}" unreadable, sending without it`);
+  bannerCache.set(file, image);
+  return image;
+}
+
+// WhatsApp trims leading blank lines, so space above the first line of a message is made with a line
+// holding one invisible character (Braille blank), which it keeps.
+const SPACER = '\u2800\n';
+
+async function sendWithBanner(jid, text, banner) {
+  const image = readBanner(banner);
+  if (!image) return rememberSent(await sock.sendMessage(jid, { text: SPACER + text }));
+  try {
+    if (text.length <= MAX_CAPTION) return rememberSent(await sock.sendMessage(jid, { image, caption: SPACER + text }));
+    // too long for a caption: banner on its own, then the full text
+    rememberSent(await sock.sendMessage(jid, { image }));
+  } catch (err) {
+    console.error('WhatsApp banner message failed, falling back to plain text:', err.message);
+  }
+  return rememberSent(await sock.sendMessage(jid, { text: SPACER + text }));
+}
+
+async function sendMessage(phone, text, { banner = 'general' } = {}) {
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   const jids = toWhatsAppJids(phone);
   if (!jids.length) throw new Error('No valid phone number on file');
   for (const jid of jids) {
-    await enqueueSend(async () => rememberSent(await sock.sendMessage(jid, { text })));
+    await enqueueSend(() => sendWithBanner(jid, text, banner));
   }
 }
 
@@ -236,7 +280,7 @@ async function sendMessageWithButton(phone, text, { buttonText, url, imagePath }
                 messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                 interactiveMessage: proto.Message.InteractiveMessage.create({
                   header,
-                  body: { text },
+                  body: { text: SPACER + text },
                   nativeFlowMessage: {
                     buttons: [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: buttonText, url, merchant_url: url }) }],
                   },
@@ -256,7 +300,7 @@ async function sendMessageWithButton(phone, text, { buttonText, url, imagePath }
       } catch (err) {
         console.error('WhatsApp button message failed, falling back to plain text:', err.message);
         const plain = text.includes(url) ? text : `${text}\n\n${buttonText}: ${url}`;
-        rememberSent(await sock.sendMessage(jid, image ? { image, caption: plain } : { text: plain }));
+        rememberSent(await sock.sendMessage(jid, image ? { image, caption: SPACER + plain } : { text: SPACER + plain }));
       }
     });
   }
@@ -274,10 +318,10 @@ async function listGroups() {
 
 // groupId is a full "...@g.us" JID, as returned by listGroups() - unlike sendMessage() this
 // doesn't go through toWhatsAppJids() since a group JID isn't a phone number.
-async function sendToGroup(groupId, text) {
+async function sendToGroup(groupId, text, { banner = 'general' } = {}) {
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   if (!groupId) throw new Error('No group selected');
-  await enqueueSend(async () => rememberSent(await sock.sendMessage(groupId, { text })));
+  await enqueueSend(() => sendWithBanner(groupId, text, banner));
 }
 
 function logout() {

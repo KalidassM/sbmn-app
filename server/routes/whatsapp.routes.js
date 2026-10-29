@@ -27,7 +27,7 @@ router.post('/test', requireAuth, requireAdmin, async (req, res) => {
   const phone = (req.body?.phone || '').trim();
   if (!phone) return res.status(400).json({ error: 'Enter a phone number' });
   try {
-    await whatsapp.sendMessage(phone, `This is a test message from your SBMN app. If you received this, WhatsApp reminders are working correctly.\n\n${signOff()}`);
+    await whatsapp.sendMessage(phone, `*Test message*\n\nThis is a test message from your SBMN app. If you received this, WhatsApp reminders are working correctly.\n\n${signOff()}`, { banner: 'test' });
     res.json({ ok: true });
   } catch (err) {
     res.status(502).json({ error: err.message });

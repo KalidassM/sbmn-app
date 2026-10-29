@@ -33,8 +33,8 @@ function reminderLink(due) {
 function buildReminderMessage(due) {
   const remaining = Number(due.amount_due) - Number(due.amount_paid);
   return (
-    `*Hi ${due.name},*  This is a reminder that your maintenance due of *₹${remaining} ` +
-    `for ${MONTH_NAMES[due.month]} ${due.year} (Site No ${due.site_no || '-'})* is still pending.\n\n` +
+    `*Hi ${due.name},*\n\nThis is a reminder that your maintenance due is still pending.\n\n` +
+    `*Amount:* ₹${remaining}\n*Month:* ${MONTH_NAMES[due.month]} ${due.year}\n*Site No:* ${due.site_no || '-'}\n\n` +
     `*Tap to pay online:*\n${reminderLink(due)}\n\n` +
     signOff()
   );

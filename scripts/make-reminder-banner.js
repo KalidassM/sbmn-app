@@ -11,10 +11,10 @@ const H = 630;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
     <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b3d1e"/><stop offset="1" stop-color="#14532d"/></linearGradient></defs>
     <rect width="${W}" height="${H}" fill="url(#g)"/>
-    <text x="70" y="215" font-family="Helvetica, Arial, sans-serif" font-size="30" letter-spacing="6" fill="#d9c27a">PAYMENT REMINDER</text>
-    <text x="70" y="300" font-family="Helvetica, Arial, sans-serif" font-size="56" font-weight="bold" fill="#ffffff">your maintenance</text>
-    <text x="70" y="385" font-family="Helvetica, Arial, sans-serif" font-size="56" font-weight="bold" fill="#ffffff">due is pending</text>
-    <rect x="70" y="430" width="120" height="6" rx="3" fill="#d9c27a"/>
+    <text x="70" y="205" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="bold" letter-spacing="9" fill="#d9c27a">PAYMENT REMINDER</text>
+    <text x="70" y="293" font-family="Helvetica, Arial, sans-serif" font-size="50" font-weight="normal" fill="#e8efe9">your maintenance</text>
+    <text x="70" y="392" font-family="Helvetica, Arial, sans-serif" font-size="68" font-weight="bold" fill="#ffffff">due is pending</text>
+    <rect x="70" y="440" width="120" height="6" rx="3" fill="#d9c27a"/>
   </svg>`;
   await sharp(Buffer.from(svg))
     .composite([{ input: logo, left: W - 460 - 60, top: (H - 460) / 2 }])
