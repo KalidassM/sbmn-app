@@ -14,9 +14,7 @@ function requireInternalSecret(req, res, next) {
   if (!expected) {
     return res.status(503).json({ ok: false, error: 'WHATSAPP_BRIDGE_SECRET is not configured on this server' });
   }
-  const given = Buffer.from(String(req.headers['x-internal-secret'] || ''));
-  const want = Buffer.from(expected);
-  if (given.length !== want.length || !require('crypto').timingSafeEqual(given, want)) {
+  if (req.headers['x-internal-secret'] !== expected) {
     return res.status(401).json({ ok: false, error: 'Invalid internal secret' });
   }
   next();

@@ -8,19 +8,11 @@ const whatsapp = require('../utils/whatsappClient');
 const { logActivity } = require('../utils/activityLog');
 const { signOff } = require('../utils/memberNotify');
 
-const { rateLimit } = require('../middleware/rateLimit');
-const { checkPassword } = require('../utils/passwordPolicy');
-
 const RESET_CODE_TTL_MINUTES = 15;
-const MAX_RESET_ATTEMPTS = 5;
-const resetAttempts = new Map(); // username -> wrong guesses for the current code
-const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: 'Too many login attempts. Try again in 15 minutes.' });
-const forgotLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, key: (req) => `${req.ip}|${req.body?.username}` });
-const resetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
 const router = express.Router();
 
-router.post('/login', loginLimiter, (req, res) => {
+router.post('/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
@@ -50,8 +42,6 @@ router.post('/change-password', requireAuth, (req, res) => {
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Current and new password required' });
   }
-  const pwError = checkPassword(newPassword);
-  if (pwError) return res.status(400).json({ error: pwError });
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!user || !bcrypt.compareSync(currentPassword, user.password_hash)) {
     return res.status(401).json({ error: 'Current password is incorrect' });
@@ -92,12 +82,12 @@ function resolveResetPhone(user) {
   return /^\d{10}$/.test(user.username) ? user.username : null;
 }
 
-router.post('/forgot-password', forgotLimiter, (req, res) => {
+router.post('/forgot-password', (req, res) => {
   const { username } = req.body || {};
   if (!username) return res.status(400).json({ error: 'Username is required' });
 
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-  if (!user) return res.json({ ok: true }); // same response as success, so usernames can't be enumerated
+  if (!user) return res.status(404).json({ error: 'No account found with that username' });
 
   const phone = resolveResetPhone(user);
   if (!phone) return res.status(400).json({ error: 'No phone number on file for this account. Contact an administrator.' });
@@ -124,28 +114,19 @@ router.post('/forgot-password', forgotLimiter, (req, res) => {
     });
 });
 
-router.post('/reset-password', resetLimiter, (req, res) => {
+router.post('/reset-password', (req, res) => {
   const { username, code, newPassword } = req.body || {};
   if (!username || !code || !newPassword) {
     return res.status(400).json({ error: 'Username, code and new password are required' });
   }
-  const pwError = checkPassword(newPassword);
-  if (pwError) return res.status(400).json({ error: pwError });
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !user.reset_code_hash) return res.status(400).json({ error: 'Invalid or expired code' });
   if (!user.reset_code_expires_at || new Date(user.reset_code_expires_at).getTime() < Date.now()) {
     return res.status(400).json({ error: 'This code has expired. Please request a new one.' });
   }
   if (!bcrypt.compareSync(String(code), user.reset_code_hash)) {
-    const n = (resetAttempts.get(user.username) || 0) + 1;
-    resetAttempts.set(user.username, n);
-    if (n >= MAX_RESET_ATTEMPTS) {
-      db.prepare('UPDATE users SET reset_code_hash = NULL, reset_code_expires_at = NULL WHERE id = ?').run(user.id);
-      resetAttempts.delete(user.username);
-    }
     return res.status(400).json({ error: 'Invalid or expired code' });
   }
-  resetAttempts.delete(user.username);
 
   const hash = bcrypt.hashSync(newPassword, 10);
   db.prepare(

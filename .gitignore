@@ -2,8 +2,6 @@ node_modules/
 data.sqlite
 data.sqlite-shm
 data.sqlite-wal
-*.sqlite*
-*.local-backup*
 .env
 whatsapp-auth/
 .db-backups/

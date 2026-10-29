@@ -7,7 +7,6 @@ const { firstPhoneDigits } = require('../utils/phone');
 const { ensureCoreMemberAccount } = require('../utils/coreMemberAccount');
 const { notifyMember, appName, signOff } = require('../utils/memberNotify');
 const { portalUrl } = require('../utils/appUrl');
-const { checkPassword } = require('../utils/passwordPolicy');
 
 // A newly-created account's WhatsApp number: the linked member's phone, or - for accounts not
 // linked to a member - the username itself if it looks like a phone number, matching the
@@ -32,8 +31,6 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   const { username, password, role, member_id } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
-  const pwError = checkPassword(password);
-  if (pwError) return res.status(400).json({ error: pwError });
   if (role === 'super_admin' && req.user.role !== 'super_admin') {
     return res.status(403).json({ error: 'Only a Super Admin can create another Super Admin account' });
   }
@@ -201,8 +198,6 @@ router.put('/:id', requireAuth, requireSuperAdmin, (req, res) => {
 router.put('/:id/reset-password', requireAuth, requireSuperAdmin, (req, res) => {
   const { password } = req.body || {};
   if (!password) return res.status(400).json({ error: 'password is required' });
-  const pwError = checkPassword(password);
-  if (pwError) return res.status(400).json({ error: pwError });
   const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'User not found' });
   const hash = bcrypt.hashSync(password, 10);
@@ -221,10 +216,6 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'User not found' });
   if (existing.username === 'admin') return res.status(400).json({ error: 'Cannot delete the default admin account' });
-  if (existing.role === 'super_admin' && req.user.role !== 'super_admin') {
-    return res.status(403).json({ error: 'Only a Super Admin can delete a Super Admin account' });
-  }
-  if (existing.id === req.user.id) return res.status(400).json({ error: 'You cannot delete your own account' });
   db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
   logActivity({
     actor: req.user?.username,
