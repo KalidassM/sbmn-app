@@ -29,7 +29,9 @@ const Api = (() => {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
-    if (res.status === 401) {
+    // Login / change-password return 401 for a wrong password - show that message, don't treat it as an expired session
+    const isCredentialCheck = path === '/auth/login' || path === '/auth/change-password';
+    if (res.status === 401 && !isCredentialCheck) {
       clearSession();
       window.location.hash = '#/login';
       throw new Error('Session expired, please log in again');
