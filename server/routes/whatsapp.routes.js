@@ -47,20 +47,26 @@ router.get('/groups', requireAuth, requireAdmin, async (req, res) => {
 // Sends an ad-hoc message to either a specific WhatsApp group or a specific member, from the
 // Send WhatsApp Message admin page - distinct from the automated monthly-dues reminders.
 router.post('/send', requireAuth, requireAdmin, async (req, res) => {
-  const { target, groupId, memberId, text } = req.body || {};
+  const { target, groupId, memberId, text, image: imageData } = req.body || {};
   const message = (text || '').trim();
-  if (!message) return res.status(400).json({ error: 'Enter a message' });
+  let image;
+  if (imageData) {
+    const m = /^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(imageData);
+    if (!m) return res.status(400).json({ error: 'Attach a JPG, PNG or WebP image' });
+    image = Buffer.from(m[1], 'base64');
+  }
+  if (!message && !image) return res.status(400).json({ error: 'Enter a message' });
 
   try {
     if (target === 'group') {
       if (!groupId) return res.status(400).json({ error: 'Select a group' });
-      await whatsapp.sendToGroup(groupId, message);
+      await whatsapp.sendToGroup(groupId, message, { image });
     } else if (target === 'member') {
       const member = db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
       if (!member) return res.status(404).json({ error: 'Member not found' });
       if (member.status !== 'active') return res.status(400).json({ error: 'This member is not active' });
       if (!member.phone) return res.status(400).json({ error: 'This member has no phone number on file' });
-      await whatsapp.sendMessage(member.phone, message);
+      await whatsapp.sendMessage(member.phone, message, { image });
     } else {
       return res.status(400).json({ error: 'Choose a group or a member to send to' });
     }

@@ -227,7 +227,14 @@ function readBanner(name) {
 // holding one invisible character (Braille blank), which it keeps.
 const SPACER = '\u2800\n';
 
-async function sendWithBanner(jid, text, banner) {
+async function sendWithBanner(jid, text, banner, customImage) {
+  // an image attached by the sender replaces the banner, and a failure to send it is reported
+  // rather than silently downgraded to text
+  if (customImage) {
+    if (text.length <= MAX_CAPTION) return rememberSent(await sock.sendMessage(jid, { image: customImage, caption: text }));
+    rememberSent(await sock.sendMessage(jid, { image: customImage }));
+    return rememberSent(await sock.sendMessage(jid, { text }));
+  }
   const image = readBanner(banner);
   if (!image) return rememberSent(await sock.sendMessage(jid, { text: SPACER + text }));
   try {
@@ -240,12 +247,12 @@ async function sendWithBanner(jid, text, banner) {
   return rememberSent(await sock.sendMessage(jid, { text: SPACER + text }));
 }
 
-async function sendMessage(phone, text, { banner = 'general' } = {}) {
+async function sendMessage(phone, text, { banner = 'general', image } = {}) {
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   const jids = toWhatsAppJids(phone);
   if (!jids.length) throw new Error('No valid phone number on file');
   for (const jid of jids) {
-    await enqueueSend(() => sendWithBanner(jid, text, banner));
+    await enqueueSend(() => sendWithBanner(jid, text, banner, image));
   }
 }
 
@@ -318,10 +325,10 @@ async function listGroups() {
 
 // groupId is a full "...@g.us" JID, as returned by listGroups() - unlike sendMessage() this
 // doesn't go through toWhatsAppJids() since a group JID isn't a phone number.
-async function sendToGroup(groupId, text, { banner = 'general' } = {}) {
+async function sendToGroup(groupId, text, { banner = 'general', image } = {}) {
   if (!isConnected()) throw new Error('WhatsApp is not connected. Scan the QR code in General Settings.');
   if (!groupId) throw new Error('No group selected');
-  await enqueueSend(() => sendWithBanner(groupId, text, banner));
+  await enqueueSend(() => sendWithBanner(groupId, text, banner, image));
 }
 
 function logout() {
