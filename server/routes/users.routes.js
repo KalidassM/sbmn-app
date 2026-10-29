@@ -79,6 +79,7 @@ router.post('/bulk-create-for-members', requireAuth, requireSuperAdmin, (req, re
   let created = 0;
   const createdAccounts = [];
   const skipped = [];
+  const toNotify = [];
 
   db.transaction((rows) => {
     for (const m of rows) {
@@ -97,6 +98,7 @@ router.post('/bulk-create-for-members', requireAuth, requireSuperAdmin, (req, re
         insertUser.run(username, hash, m.id);
         created++;
         createdAccounts.push({ member_id: m.id, name: m.name, username });
+        toNotify.push({ phone: m.phone, name: m.name, username, password });
       } catch (err) {
         skipped.push({ member_id: m.id, name: m.name, reason: 'Username already exists (duplicate phone number)' });
       }
@@ -110,6 +112,19 @@ router.post('/bulk-create-for-members', requireAuth, requireSuperAdmin, (req, re
     description: `Bulk-created ${created} member login account(s); ${skipped.length} skipped`,
   });
   res.json({ created, createdAccounts, skipped });
+
+  // Send each member their login details one at a time with a pause between sends - a burst of
+  // messages from one WhatsApp number can get it flagged. Runs after the response so the button
+  // doesn't wait on it.
+  (async () => {
+    for (const a of toNotify) {
+      await notifyMember(
+        { phone: a.phone },
+        `Hi ${a.name}, your login account for ${appName()} has been created. Username: ${a.username}, Password: ${a.password}. Please log in at ${portalUrl()} and change your password.\n\n${signOff()}`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  })();
 });
 
 // Catches up any Core Member assigned before the auto-account flow existed (or whose account
