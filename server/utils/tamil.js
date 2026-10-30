@@ -21,8 +21,15 @@ async function cached(key, fn) {
   return value;
 }
 
-// Sound-alike spelling in Tamil script, e.g. "Kalidass Murugesan" -> "காளிதாஸ் முருகேசன்"
-function transliterate(text) {
+// Sound-alike spelling in Tamil script, e.g. "Kalidass Murugesan" -> "காளிதாஸ் முருகேசன்".
+// Initials (single letters such as the "R" in "Prabhu R") are kept in English.
+async function transliterate(text) {
+  const words = text.trim().split(/\s+/);
+  const out = await Promise.all(words.map((w) => (/^[A-Za-z]\.?$/.test(w) ? w : transliterateWord(w))));
+  return out.some((w) => !w) ? null : out.join(' ');
+}
+
+function transliterateWord(text) {
   return cached(`n:${text}`, async () => {
     const data = await getJson(
       `https://inputtools.google.com/request?text=${encodeURIComponent(text)}&itc=ta-t-i0-und&num=1&ie=utf-8&oe=utf-8&app=demopage`

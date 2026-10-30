@@ -75,10 +75,11 @@ async function withRegards(text, user, signAs) {
       name = row.name_ta || (await transliterate(row.name)) || row.name;
       if (row.designation) designation = row.designation_ta || (await translate(row.designation)) || row.designation;
     }
-    who = designation ? `*${name}*\n${designation}` : `*${name}*`;
+    who = designation ? `*${name},*\n*${designation},*` : `*${name},*`;
   }
   const sig = `${tamil ? 'அன்புடன்,' : 'Regards,'}\n${who}`;
-  return text ? `${text}\n\n${sig}` : sig;
+  const ass_text =`*${tamil ? 'ஸ்ரீ பாலமுருகன் நகர் குடியிருப்போர் நலச்சங்கம்' : 'Sri Balamurugan Nagar Welfare Association'}*`;
+  return text ? `${text}\n\n${sig}\n${ass_text}` : `${sig}\n${ass_text}`;
 }
 
 // Sends an ad-hoc message to either a specific WhatsApp group or a specific member, from the
