@@ -19,28 +19,28 @@ function pettyCashBalance() {
 function expenseMessage(expense, actor) {
   const fromPettyCash = expense.source === 'petty_cash';
   const lines = [
-    `*New ${fromPettyCash ? 'Petty Cash Expense' : 'Bank Expense'} Recorded*`,
-    `*Title:* ${expense.title}`,
-    expense.category ? `*Category:* ${expense.category}` : null,
-    `*Amount:* ${formatAmount(expense.amount)}`,
-    `*Date:* ${formatDate(expense.expense_date)}`,
-    `*Paid from:* ${fromPettyCash ? 'Petty cash' : 'Bank'}`,
-    expense.notes && !fromPettyCash ? `*Notes:* ${expense.notes}` : null,
-    fromPettyCash ? `*Petty cash balance:* ${formatAmount(pettyCashBalance())}` : null,
-    actor ? `*Recorded by:* ${actor}` : null,
+    `🧾 *New ${fromPettyCash ? 'Petty Cash Expense' : 'Bank Expense'} Recorded*`,
+    `📝 *Title:* ${expense.title}`,
+    expense.category ? `🏷️ *Category:* ${expense.category}` : null,
+    `💵 *Amount:* ${formatAmount(expense.amount)}`,
+    `📅 *Date:* ${formatDate(expense.expense_date)}`,
+    `${fromPettyCash ? '👛' : '🏦'} *Paid from:* ${fromPettyCash ? 'Petty cash' : 'Bank'}`,
+    expense.notes && !fromPettyCash ? `🗒️ *Notes:* ${expense.notes}` : null,
+    fromPettyCash ? `💼 *Petty cash balance:* ${formatAmount(pettyCashBalance())}` : null,
+    actor ? `✍️ *Recorded by:* ${actor}` : null,
   ].filter(Boolean);
   return `${lines[0]}\n\n${lines.slice(1).join('\n')}\n\n${signOff()}`;
 }
 
 function topupMessage(txn, actor) {
   const lines = [
-    '*New Petty Cash Top-up Recorded*',
-    `*Amount:* ${formatAmount(txn.amount)}`,
-    `*Date:* ${formatDate(txn.txn_date)}`,
-    `*Details:* ${txn.description}`,
-    txn.category ? `*Category:* ${txn.category}` : null,
-    `*Petty cash balance:* ${formatAmount(pettyCashBalance())}`,
-    actor ? `*Recorded by:* ${actor}` : null,
+    '💰 *New Petty Cash Top-up Recorded*',
+    `💵 *Amount:* ${formatAmount(txn.amount)}`,
+    `📅 *Date:* ${formatDate(txn.txn_date)}`,
+    `📝 *Details:* ${txn.description}`,
+    txn.category ? `🏷️ *Category:* ${txn.category}` : null,
+    `💼 *Petty cash balance:* ${formatAmount(pettyCashBalance())}`,
+    actor ? `✍️ *Recorded by:* ${actor}` : null,
   ].filter(Boolean);
   return `${lines[0]}\n\n${lines.slice(1).join('\n')}\n\n${signOff()}`;
 }

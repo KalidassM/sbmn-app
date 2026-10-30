@@ -24,7 +24,7 @@ function ensureCoreMemberAccount(memberId) {
     db.prepare('UPDATE users SET role = ? WHERE id = ?').run('admin', existing.id);
     notifyMember(
       member,
-      `*Hi ${member.name},*\n\nYou've been made a Core Member of ${bold(appName())}. Your existing account (${existing.username}) now has admin access.\n\n*Visit the portal:*\n${portalUrl()}\n\n${signOff()}`,
+      `👋 *Hi ${member.name},*\n\n🎖️ You've been made a Core Member of ${bold(appName())}. Your existing account (${existing.username}) now has admin access.\n\n🌐 *Visit the portal:*\n${portalUrl()}\n\n${signOff()}`,
       'account'
     );
     return { action: 'upgraded', username: existing.username };

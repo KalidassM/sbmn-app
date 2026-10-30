@@ -21,7 +21,7 @@ async function cached(key, fn) {
   return value;
 }
 
-// Sound-alike spelling in Tamil script, e.g. "Kalidass Murugesan" -> "காளிதாஸ் முருகேசன்".
+// Sound-alike spelling in Tamil script, e.g. "" -> "காளிதாஸ் முருகேசன்".
 // Initials (single letters such as the "R" in "Prabhu R") are kept in English.
 async function transliterate(text) {
   const words = text.trim().split(/\s+/);

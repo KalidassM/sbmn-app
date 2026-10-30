@@ -14,6 +14,7 @@ window.SendWhatsappPage = {
             <div style="display:flex;gap:16px;">
               <label style="font-weight:normal;"><input type="radio" name="target" value="group" checked /> WhatsApp Group</label>
               <label style="font-weight:normal;"><input type="radio" name="target" value="member" /> Member</label>
+              <label style="font-weight:normal;"><input type="radio" name="target" value="guest" /> Guest</label>
             </div>
           </div>
           <div class="field" id="groupField">
@@ -23,6 +24,16 @@ window.SendWhatsappPage = {
           <div class="field" id="memberField" style="display:none;"> 
             <label>Member</label>
             <select id="memberSelect"><option value="">Loading members…</option></select>
+          </div>
+          <div id="guestField" style="display:none;">
+            <div class="field">
+              <label>Guest name (optional)</label>
+              <input type="text" id="guestName" />
+            </div>
+            <div class="field">
+              <label>Guest phone number</label>
+              <input type="tel" id="guestPhone" placeholder="10-digit mobile number" />
+            </div>
           </div>
           <div class="field" id="signAsField" style="display:none;">
             <label>Sign as</label>
@@ -38,9 +49,25 @@ window.SendWhatsappPage = {
             <img id="imagePreview" alt="" style="display:none;max-width:240px;margin-top:8px;border-radius:6px;" />
           </div>
           <div class="toolbar mt-16">
-            <button type="submit" id="sendBtn">Send</button>
+            <button type="submit" id="sendBtn">Preview</button>
           </div>
         </form>
+      </div>
+
+      <div class="panel mt-16" id="previewPanel" style="display:none;">
+        <h2>Preview</h2>
+        <p class="page-sub" id="previewTo"></p>
+        <div id="previewText" style="white-space:pre-wrap;background:#dcf8c6;border-radius:8px;padding:12px;max-width:520px;"></div>
+        <img id="previewImage" alt="" style="display:none;max-width:240px;margin-top:8px;border-radius:6px;" />
+        <div class="toolbar mt-16">
+          <button type="button" id="confirmSendBtn">Confirm &amp; Send</button>
+          <button type="button" class="secondary" id="cancelPreviewBtn">Edit</button>
+        </div>
+      </div>
+
+      <div class="panel mt-16">
+        <h2>Sent messages</h2>
+        <div id="historyList"><p class="page-sub">Loading…</p></div>
       </div>
     `;
 
@@ -49,6 +76,7 @@ window.SendWhatsappPage = {
         this.state.target = e.target.value;
         document.getElementById('groupField').style.display = this.state.target === 'group' ? '' : 'none';
         document.getElementById('memberField').style.display = this.state.target === 'member' ? '' : 'none';
+        document.getElementById('guestField').style.display = this.state.target === 'guest' ? '' : 'none';
       });
     });
 
@@ -70,10 +98,12 @@ window.SendWhatsappPage = {
 
     document.getElementById('sendForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      this.send();
+      this.preview();
     });
+    document.getElementById('confirmSendBtn').addEventListener('click', () => this.send());
+    document.getElementById('cancelPreviewBtn').addEventListener('click', () => this.hidePreview());
 
-    await Promise.all([this.loadGroups(), this.loadMembers(), this.loadSigners()]);
+    await Promise.all([this.loadGroups(), this.loadMembers(), this.loadSigners(), this.loadHistory()]);
   },
 
   async loadGroups() {
@@ -87,6 +117,42 @@ window.SendWhatsappPage = {
     } catch (err) {
       select.innerHTML = '<option value="">Unable to load groups</option>';
       this.showAlert(err.message);
+    }
+  },
+
+  async loadHistory() {
+    const box = document.getElementById('historyList');
+    try {
+      const rows = await Api.get('/whatsapp/history');
+      const canDelete = Api.getUser()?.role === 'super_admin';
+      box.innerHTML = rows.length
+        ? `<div class="table-wrap"><table>
+            <thead><tr><th>Sent</th><th>To</th><th>Message</th><th>By</th>${canDelete ? '<th></th>' : ''}</tr></thead>
+            <tbody>${rows
+              .map(
+                (r) => `<tr>
+                  <td style="white-space:nowrap;">${Util.escapeHtml(new Date(r.sent_at.replace(' ', 'T') + 'Z').toLocaleString('en-IN'))}</td>
+                  <td>${r.target === 'group' ? '👥' : r.target === 'guest' ? '🧑‍🤝‍🧑' : '👤'} ${Util.escapeHtml(r.recipient_name)}</td>
+                  <td style="white-space:pre-wrap;">${Util.escapeHtml(r.message)}${r.has_image ? ' 🖼️' : ''}</td>
+                  <td>${Util.escapeHtml(r.sent_by || '-')}</td>
+                  ${canDelete ? `<td><button type="button" class="small danger" data-delete="${r.id}">Delete</button></td>` : ''}
+                </tr>`
+              )
+              .join('')}</tbody></table></div>`
+        : '<p class="page-sub">No messages sent yet.</p>';
+      box.querySelectorAll('[data-delete]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this message from the history?')) return;
+          try {
+            await Api.del(`/whatsapp/history/${btn.dataset.delete}`);
+            this.loadHistory();
+          } catch (err) {
+            this.showAlert(err.message);
+          }
+        });
+      });
+    } catch (err) {
+      box.innerHTML = `<p class="page-sub">${Util.escapeHtml(err.message)}</p>`;
     }
   },
 
@@ -145,11 +211,45 @@ window.SendWhatsappPage = {
     });
   },
 
-  async send() {
+  hidePreview() {
+    document.getElementById('previewPanel').style.display = 'none';
+    document.getElementById('sendForm').style.display = '';
+    this.state.pending = null;
+  },
+
+  // Validates the form, then shows the final message (with signature) for confirmation.
+  async preview() {
+    const body = this.buildBody();
+    if (!body) return;
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    try {
+      const { message } = await Api.post('/whatsapp/preview', { text: body.text, signAs: body.signAs });
+      let to;
+      if (body.target === 'group') to = `Group: ${body.groupName || ''}`;
+      else if (body.target === 'guest') to = `Guest: ${body.guestName || ''} ${body.guestPhone}`.trim();
+      else to = `Member: ${this.state.members.find((m) => String(m.id) === body.memberId)?.name || ''}`;
+      this.state.pending = body;
+      document.getElementById('previewTo').textContent = `To — ${to}`;
+      document.getElementById('previewText').textContent = message;
+      const img = document.getElementById('previewImage');
+      img.src = body.image || '';
+      img.style.display = body.image ? '' : 'none';
+      document.getElementById('alertBox').innerHTML = '';
+      document.getElementById('sendForm').style.display = 'none';
+      document.getElementById('previewPanel').style.display = '';
+    } catch (err) {
+      this.showAlert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  },
+
+  buildBody() {
     const target = this.state.target;
     const text = document.getElementById('messageText').value.trim();
     const image = this.state.image;
-    if (!text && !image) return this.showAlert('Enter a message or attach an image');
+    if (!text && !image) return this.showAlert('Enter a message or attach an image'), null;
 
     const body = { target, text };
     const signAs = document.getElementById('signAsSelect').value;
@@ -157,13 +257,23 @@ window.SendWhatsappPage = {
     if (image) body.image = image;
     if (target === 'group') {
       body.groupId = document.getElementById('groupSelect').value;
-      if (!body.groupId) return this.showAlert('Select a group');
+      if (!body.groupId) return this.showAlert('Select a group'), null;
+      body.groupName = this.state.groups.find((g) => g.id === body.groupId)?.name;
+    } else if (target === 'guest') {
+      body.guestPhone = document.getElementById('guestPhone').value.trim();
+      body.guestName = document.getElementById('guestName').value.trim();
+      if (!body.guestPhone) return this.showAlert('Enter the guest phone number'), null;
     } else {
       body.memberId = document.getElementById('memberSelect').value;
-      if (!body.memberId) return this.showAlert('Select a member');
+      if (!body.memberId) return this.showAlert('Select a member'), null;
     }
+    return body;
+  },
 
-    const btn = document.getElementById('sendBtn');
+  async send() {
+    const body = this.state.pending;
+    if (!body) return;
+    const btn = document.getElementById('confirmSendBtn');
     btn.disabled = true;
     try {
       await Api.post('/whatsapp/send', body);
@@ -171,7 +281,11 @@ window.SendWhatsappPage = {
       document.getElementById('messageText').value = '';
       document.getElementById('imageFile').value = '';
       document.getElementById('imagePreview').style.display = 'none';
+      document.getElementById('guestName').value = '';
+      document.getElementById('guestPhone').value = '';
       this.state.image = null;
+      this.hidePreview();
+      this.loadHistory();
     } catch (err) {
       this.showAlert(err.message);
     } finally {

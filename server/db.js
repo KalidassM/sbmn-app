@@ -157,6 +157,17 @@ CREATE TABLE IF NOT EXISTS activity_log (
   description TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS whatsapp_sent_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  target TEXT NOT NULL,
+  recipient_name TEXT NOT NULL,
+  recipient_ref TEXT,
+  message TEXT NOT NULL,
+  has_image INTEGER NOT NULL DEFAULT 0,
+  sent_by TEXT,
+  sent_at TEXT DEFAULT (datetime('now'))
+);
 `);
 
 db.prepare('INSERT OR IGNORE INTO payment_settings (id) VALUES (1)').run();

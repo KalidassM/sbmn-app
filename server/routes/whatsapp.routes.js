@@ -1,8 +1,9 @@
 const express = require('express');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const whatsapp = require('../utils/whatsappClient');
 const { signOff } = require('../utils/memberNotify');
 const db = require('../db');
+const { firstPhoneDigits } = require('../utils/phone');
 const { transliterate, translate } = require('../utils/tamil');
 
 const router = express.Router();
@@ -28,7 +29,7 @@ router.post('/test', requireAuth, requireAdmin, async (req, res) => {
   const phone = (req.body?.phone || '').trim();
   if (!phone) return res.status(400).json({ error: 'Enter a phone number' });
   try {
-    await whatsapp.sendMessage(phone, `*Test message*\n\nThis is a test message from your SBMN app. If you received this, WhatsApp reminders are working correctly.\n\n${signOff()}`, { banner: 'test' });
+    await whatsapp.sendMessage(phone, `🧪 *Test message*\n\nThis is a test message from your SBMN app. If you received this, WhatsApp reminders are working correctly. ✅\n\n${signOff()}`, { banner: 'test' });
     res.json({ ok: true });
   } catch (err) {
     res.status(502).json({ error: err.message });
@@ -45,7 +46,7 @@ router.get('/groups', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// Appends "Regards," plus the sender: super admins sign with their own member name (or as a core member they pick; "Admin" if no member is linked),
+// Appends "Regards," plus the sender: super admins sign with their own member name (or as a core member they pick; just the association name if no member is linked),
 // core members as their name and current designation. Other admins without a core-member role get
 // just their member name. A message containing Tamil is signed in Tamil: the saved Tamil name/
 // designation if set, else converted automatically (English if that fails). English messages are
@@ -56,14 +57,16 @@ async function withRegards(text, user, signAs) {
   const cmSelect = `SELECT m.name, cm.name_ta, cm.designation, cm.designation_ta
     FROM core_members cm JOIN members m ON m.id = cm.member_id`;
   let row = null;
+  // member_id in the login token goes stale if the account is linked/unlinked later, so read it fresh
+  const memberId = db.prepare('SELECT member_id FROM users WHERE id = ?').get(user.id)?.member_id || null;
   if (user.role === 'super_admin') {
     if (signAs) row = db.prepare(`${cmSelect} WHERE cm.id = ? AND cm.end_date IS NULL`).get(signAs);
     // otherwise sign with the super admin's own member name, "Admin" only if none is linked
-    if (!row && user.member_id) row = db.prepare('SELECT name FROM members WHERE id = ?').get(user.member_id);
-  } else if (user.member_id) {
+    if (!row && memberId) row = db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
+  } else if (memberId) {
     row =
-      db.prepare(`${cmSelect} WHERE cm.member_id = ? AND cm.end_date IS NULL ORDER BY cm.start_date DESC LIMIT 1`).get(user.member_id) ||
-      db.prepare('SELECT name FROM members WHERE id = ?').get(user.member_id);
+      db.prepare(`${cmSelect} WHERE cm.member_id = ? AND cm.end_date IS NULL ORDER BY cm.start_date DESC LIMIT 1`).get(memberId) ||
+      db.prepare('SELECT name FROM members WHERE id = ?').get(memberId);
   }
   const tamil = TAMIL.test(text);
   let who = `*${tamil ? 'நிர்வாகி' : 'Admin'}*`;
@@ -79,13 +82,22 @@ async function withRegards(text, user, signAs) {
   }
   const sig = `${tamil ? 'அன்புடன்,' : 'Regards,'}\n${who}`;
   const ass_text =`*${tamil ? 'ஸ்ரீ பாலமுருகன் நகர் குடியிருப்போர் நலச்சங்கம்' : 'Sri Balamurugan Nagar Welfare Association'}*`;
+  // A super admin with no linked member and no core member picked has no name to sign with: just the association.
+  if (!row && user.role === 'super_admin') return text ? `${text}\n\n${ass_text}` : ass_text;
   return text ? `${text}\n\n${sig}\n${ass_text}` : `${sig}\n${ass_text}`;
 }
+
+// Returns the exact text that /send would deliver (body plus the Regards signature) so the admin
+// can review it before confirming.
+router.post('/preview', requireAuth, requireAdmin, async (req, res) => {
+  const { text, signAs } = req.body || {};
+  res.json({ message: await withRegards((text || '').trim(), req.user, signAs) });
+});
 
 // Sends an ad-hoc message to either a specific WhatsApp group or a specific member, from the
 // Send WhatsApp Message admin page - distinct from the automated monthly-dues reminders.
 router.post('/send', requireAuth, requireAdmin, async (req, res) => {
-  const { target, groupId, memberId, text, image: imageData, signAs } = req.body || {};
+  const { target, groupId, groupName, memberId, guestName, guestPhone, text, image: imageData, signAs } = req.body || {};
   const body = (text || '').trim();
   let image;
   if (imageData) {
@@ -96,23 +108,57 @@ router.post('/send', requireAuth, requireAdmin, async (req, res) => {
   if (!body && !image) return res.status(400).json({ error: 'Enter a message' });
   const message = await withRegards(body, req.user, signAs);
 
+  let recipientName;
+  let recipientRef;
   try {
     if (target === 'group') {
       if (!groupId) return res.status(400).json({ error: 'Select a group' });
       await whatsapp.sendToGroup(groupId, message, { image });
+      recipientName = String(groupName || 'WhatsApp group').slice(0, 200);
+      recipientRef = String(groupId);
     } else if (target === 'member') {
       const member = db.prepare('SELECT * FROM members WHERE id = ?').get(memberId);
       if (!member) return res.status(404).json({ error: 'Member not found' });
       if (member.status !== 'active') return res.status(400).json({ error: 'This member is not active' });
       if (!member.phone) return res.status(400).json({ error: 'This member has no phone number on file' });
       await whatsapp.sendMessage(member.phone, message, { image });
+      recipientName = member.name;
+      recipientRef = String(member.id);
+    } else if (target === 'guest') {
+      const digits = firstPhoneDigits(guestPhone);
+      if (!digits) return res.status(400).json({ error: 'Enter a valid 10-digit phone number for the guest' });
+      await whatsapp.sendMessage(digits, message, { image });
+      recipientName = String(guestName || '').trim().slice(0, 200) || `Guest (${digits})`;
+      recipientRef = digits;
     } else {
-      return res.status(400).json({ error: 'Choose a group or a member to send to' });
+      return res.status(400).json({ error: 'Choose a group, a member or a guest to send to' });
     }
-    res.json({ ok: true });
   } catch (err) {
-    res.status(502).json({ error: err.message });
+    return res.status(502).json({ error: err.message });
   }
+  // The message has already gone out, so a history-logging failure must not turn it into an error.
+  try {
+    db.prepare(
+      'INSERT INTO whatsapp_sent_messages (target, recipient_name, recipient_ref, message, has_image, sent_by) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(target, recipientName, recipientRef, message, image ? 1 : 0, req.user.username || null);
+  } catch (err) {
+    console.error('Saving WhatsApp message history failed:', err.message);
+  }
+  res.json({ ok: true });
+});
+
+// History of messages sent from the Send WhatsApp page (individual and group), newest first.
+router.get('/history', requireAuth, requireAdmin, (req, res) => {
+  const rows = db
+    .prepare('SELECT id, target, recipient_name, message, has_image, sent_by, sent_at FROM whatsapp_sent_messages ORDER BY id DESC LIMIT 200')
+    .all();
+  res.json(rows);
+});
+
+router.delete('/history/:id', requireAuth, requireSuperAdmin, (req, res) => {
+  const result = db.prepare('DELETE FROM whatsapp_sent_messages WHERE id = ?').run(req.params.id);
+  if (!result.changes) return res.status(404).json({ error: 'Message not found' });
+  res.json({ ok: true });
 });
 
 module.exports = router;
