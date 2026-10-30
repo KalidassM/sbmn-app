@@ -102,6 +102,8 @@ window.CoreMembersPage = {
             <select id="f_member" ${isEdit ? 'disabled' : ''}>${memberOptions}</select>
           </div>
           <div class="field"><label>Designation</label><input id="f_designation" required placeholder="President, Secretary, Treasurer..." value="${Util.escapeHtml(row?.designation || '')}" /></div>
+          <div class="field"><label>Name (Tamil, optional)</label><input id="f_name_ta" placeholder="தமிழில் பெயர்" value="${Util.escapeHtml(row?.name_ta || '')}" /></div>
+          <div class="field"><label>Designation (Tamil, optional)</label><input id="f_designation_ta" placeholder="தலைவர், செயலாளர், பொருளாளர்..." value="${Util.escapeHtml(row?.designation_ta || '')}" /></div>
           <div class="field"><label>Start Date</label><input id="f_start" type="date" value="${row?.start_date || Util.todayISO()}" /></div>
           <div class="field"><label>End Date (optional)</label><input id="f_end" type="date" value="${row?.end_date || ''}" /></div>
           <div class="field"><label>Notes</label><input id="f_notes" value="${Util.escapeHtml(row?.notes || '')}" /></div>
@@ -130,6 +132,8 @@ window.CoreMembersPage = {
         const payload = {
           member_id: Number(document.getElementById('f_member').value),
           designation: document.getElementById('f_designation').value.trim(),
+          name_ta: document.getElementById('f_name_ta').value.trim(),
+          designation_ta: document.getElementById('f_designation_ta').value.trim(),
           start_date: document.getElementById('f_start').value,
           end_date: document.getElementById('f_end').value || null,
           notes: document.getElementById('f_notes').value.trim(),

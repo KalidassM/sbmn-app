@@ -24,6 +24,10 @@ window.SendWhatsappPage = {
             <label>Member</label>
             <select id="memberSelect"><option value="">Loading members…</option></select>
           </div>
+          <div class="field" id="signAsField" style="display:none;">
+            <label>Sign as</label>
+            <select id="signAsSelect"><option value="">Myself</option></select>
+          </div>
           <div class="field">
             <label>Message</label>
             <textarea id="messageText" rows="5" placeholder="Type your message..."></textarea>
@@ -69,7 +73,7 @@ window.SendWhatsappPage = {
       this.send();
     });
 
-    await Promise.all([this.loadGroups(), this.loadMembers()]);
+    await Promise.all([this.loadGroups(), this.loadMembers(), this.loadSigners()]);
   },
 
   async loadGroups() {
@@ -82,6 +86,20 @@ window.SendWhatsappPage = {
         : '<option value="">No groups found</option>';
     } catch (err) {
       select.innerHTML = '<option value="">Unable to load groups</option>';
+      this.showAlert(err.message);
+    }
+  },
+
+  // Super admins can sign the message as any current core member instead of "Admin".
+  async loadSigners() {
+    if (Api.getUser()?.role !== 'super_admin') return;
+    try {
+      const rows = (await Api.get('/core-members')).filter((r) => !r.end_date);
+      document.getElementById('signAsSelect').innerHTML =
+        '<option value="">Myself</option>' +
+        rows.map((r) => `<option value="${r.id}">${Util.escapeHtml(r.member_name)}, ${Util.escapeHtml(r.designation)}</option>`).join('');
+      document.getElementById('signAsField').style.display = '';
+    } catch (err) {
       this.showAlert(err.message);
     }
   },
@@ -134,6 +152,8 @@ window.SendWhatsappPage = {
     if (!text && !image) return this.showAlert('Enter a message or attach an image');
 
     const body = { target, text };
+    const signAs = document.getElementById('signAsSelect').value;
+    if (signAs) body.signAs = signAs;
     if (image) body.image = image;
     if (target === 'group') {
       body.groupId = document.getElementById('groupSelect').value;

@@ -346,6 +346,10 @@ const coreMemberColumns = db.prepare('PRAGMA table_info(core_members)').all().ma
 if (!coreMemberColumns.includes('photo')) {
   db.exec('ALTER TABLE core_members ADD COLUMN photo TEXT');
 }
+// Migration: Tamil name/designation, used in the sign-off of Tamil WhatsApp messages
+['name_ta', 'designation_ta'].forEach((col) => {
+  if (!coreMemberColumns.includes(col)) db.exec(`ALTER TABLE core_members ADD COLUMN ${col} TEXT`);
+});
 
 // Migration: add the super_admin role (full access, incl. Payment/General Settings which
 // regular admins can no longer reach). SQLite can't ALTER a CHECK constraint in place, so

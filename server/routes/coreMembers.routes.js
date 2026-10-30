@@ -18,7 +18,7 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
-  const { member_id, designation, start_date, end_date, notes, photo } = req.body || {};
+  const { member_id, designation, start_date, end_date, notes, photo, name_ta, designation_ta } = req.body || {};
   if (!member_id || !designation) {
     return res.status(400).json({ error: 'member_id and designation are required' });
   }
@@ -26,10 +26,10 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   if (!member) return res.status(400).json({ error: 'Member does not exist' });
   const info = db
     .prepare(
-      `INSERT INTO core_members (member_id, designation, start_date, end_date, notes, photo)
-       VALUES (?, ?, COALESCE(?, date('now')), ?, ?, ?)`
+      `INSERT INTO core_members (member_id, designation, start_date, end_date, notes, photo, name_ta, designation_ta)
+       VALUES (?, ?, COALESCE(?, date('now')), ?, ?, ?, ?, ?)`
     )
-    .run(member_id, designation, start_date || null, end_date || null, notes || null, photo || null);
+    .run(member_id, designation, start_date || null, end_date || null, notes || null, photo || null, (name_ta || '').trim() || null, (designation_ta || '').trim() || null);
   const row = db.prepare(`${SELECT_JOIN} WHERE cm.id = ?`).get(info.lastInsertRowid);
   logActivity({
     actor: req.user?.username,
@@ -58,15 +58,17 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM core_members WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Core member record not found' });
-  const { designation, start_date, end_date, notes, photo } = req.body || {};
+  const { designation, start_date, end_date, notes, photo, name_ta, designation_ta } = req.body || {};
   db.prepare(
-    `UPDATE core_members SET designation = ?, start_date = ?, end_date = ?, notes = ?, photo = ? WHERE id = ?`
+    `UPDATE core_members SET designation = ?, start_date = ?, end_date = ?, notes = ?, photo = ?, name_ta = ?, designation_ta = ? WHERE id = ?`
   ).run(
     designation ?? existing.designation,
     start_date ?? existing.start_date,
     end_date !== undefined ? end_date : existing.end_date,
     notes ?? existing.notes,
     photo !== undefined ? photo : existing.photo,
+    name_ta !== undefined ? (name_ta || '').trim() || null : existing.name_ta,
+    designation_ta !== undefined ? (designation_ta || '').trim() || null : existing.designation_ta,
     req.params.id
   );
   const row = db.prepare(`${SELECT_JOIN} WHERE cm.id = ?`).get(req.params.id);

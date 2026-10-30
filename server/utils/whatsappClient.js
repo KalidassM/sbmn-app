@@ -223,28 +223,29 @@ function readBanner(name) {
   return image;
 }
 
-// WhatsApp trims leading blank lines, so space above the first line of a message is made with a line
-// holding one invisible character (Braille blank), which it keeps.
-const SPACER = '\u2800\n';
+// WhatsApp trims blank lines, so spacing is made with a line holding one invisible character
+// (Braille blank), which it keeps.
+// No gap above the text; one invisible-character line below it so the bubble's bottom isn't cramped.
+const pad = (t) => `${t}\n\u2800`;
 
 async function sendWithBanner(jid, text, banner, customImage) {
   // an image attached by the sender replaces the banner, and a failure to send it is reported
   // rather than silently downgraded to text
   if (customImage) {
-    if (text.length <= MAX_CAPTION) return rememberSent(await sock.sendMessage(jid, { image: customImage, caption: text }));
+    if (text.length <= MAX_CAPTION) return rememberSent(await sock.sendMessage(jid, { image: customImage, caption: pad(text) }));
     rememberSent(await sock.sendMessage(jid, { image: customImage }));
-    return rememberSent(await sock.sendMessage(jid, { text }));
+    return rememberSent(await sock.sendMessage(jid, { text: pad(text) }));
   }
   const image = readBanner(banner);
-  if (!image) return rememberSent(await sock.sendMessage(jid, { text: SPACER + text }));
+  if (!image) return rememberSent(await sock.sendMessage(jid, { text: pad(text) }));
   try {
-    if (text.length <= MAX_CAPTION) return rememberSent(await sock.sendMessage(jid, { image, caption: SPACER + text }));
+    if (text.length <= MAX_CAPTION) return rememberSent(await sock.sendMessage(jid, { image, caption: pad(text) }));
     // too long for a caption: banner on its own, then the full text
     rememberSent(await sock.sendMessage(jid, { image }));
   } catch (err) {
     console.error('WhatsApp banner message failed, falling back to plain text:', err.message);
   }
-  return rememberSent(await sock.sendMessage(jid, { text: SPACER + text }));
+  return rememberSent(await sock.sendMessage(jid, { text: pad(text) }));
 }
 
 async function sendMessage(phone, text, { banner = 'general', image } = {}) {
@@ -287,7 +288,7 @@ async function sendMessageWithButton(phone, text, { buttonText, url, imagePath }
                 messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
                 interactiveMessage: proto.Message.InteractiveMessage.create({
                   header,
-                  body: { text: SPACER + text },
+                  body: { text: pad(text) },
                   nativeFlowMessage: {
                     buttons: [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: buttonText, url, merchant_url: url }) }],
                   },
@@ -307,7 +308,7 @@ async function sendMessageWithButton(phone, text, { buttonText, url, imagePath }
       } catch (err) {
         console.error('WhatsApp button message failed, falling back to plain text:', err.message);
         const plain = text.includes(url) ? text : `${text}\n\n${buttonText}: ${url}`;
-        rememberSent(await sock.sendMessage(jid, image ? { image, caption: SPACER + plain } : { text: SPACER + plain }));
+        rememberSent(await sock.sendMessage(jid, image ? { image, caption: pad(plain) } : { text: pad(plain) }));
       }
     });
   }

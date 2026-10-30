@@ -3,6 +3,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const whatsapp = require('../utils/whatsappClient');
 const { signOff } = require('../utils/memberNotify');
 const db = require('../db');
+const { transliterate, translate } = require('../utils/tamil');
 
 const router = express.Router();
 
@@ -44,18 +45,55 @@ router.get('/groups', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// Appends "Regards," plus the sender: super admins sign with their own member name (or as a core member they pick; "Admin" if no member is linked),
+// core members as their name and current designation. Other admins without a core-member role get
+// just their member name. A message containing Tamil is signed in Tamil: the saved Tamil name/
+// designation if set, else converted automatically (English if that fails). English messages are
+// signed in English.
+const TAMIL = /[\u0B80-\u0BFF]/;
+
+async function withRegards(text, user, signAs) {
+  const cmSelect = `SELECT m.name, cm.name_ta, cm.designation, cm.designation_ta
+    FROM core_members cm JOIN members m ON m.id = cm.member_id`;
+  let row = null;
+  if (user.role === 'super_admin') {
+    if (signAs) row = db.prepare(`${cmSelect} WHERE cm.id = ? AND cm.end_date IS NULL`).get(signAs);
+    // otherwise sign with the super admin's own member name, "Admin" only if none is linked
+    if (!row && user.member_id) row = db.prepare('SELECT name FROM members WHERE id = ?').get(user.member_id);
+  } else if (user.member_id) {
+    row =
+      db.prepare(`${cmSelect} WHERE cm.member_id = ? AND cm.end_date IS NULL ORDER BY cm.start_date DESC LIMIT 1`).get(user.member_id) ||
+      db.prepare('SELECT name FROM members WHERE id = ?').get(user.member_id);
+  }
+  const tamil = TAMIL.test(text);
+  let who = `*${tamil ? 'நிர்வாகி' : 'Admin'}*`;
+  if (row) {
+    // saved Tamil value first, then an automatic conversion, then the English as entered
+    let name = row.name;
+    let designation = row.designation;
+    if (tamil) {
+      name = row.name_ta || (await transliterate(row.name)) || row.name;
+      if (row.designation) designation = row.designation_ta || (await translate(row.designation)) || row.designation;
+    }
+    who = designation ? `*${name}*\n${designation}` : `*${name}*`;
+  }
+  const sig = `${tamil ? 'அன்புடன்,' : 'Regards,'}\n${who}`;
+  return text ? `${text}\n\n${sig}` : sig;
+}
+
 // Sends an ad-hoc message to either a specific WhatsApp group or a specific member, from the
 // Send WhatsApp Message admin page - distinct from the automated monthly-dues reminders.
 router.post('/send', requireAuth, requireAdmin, async (req, res) => {
-  const { target, groupId, memberId, text, image: imageData } = req.body || {};
-  const message = (text || '').trim();
+  const { target, groupId, memberId, text, image: imageData, signAs } = req.body || {};
+  const body = (text || '').trim();
   let image;
   if (imageData) {
     const m = /^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(imageData);
     if (!m) return res.status(400).json({ error: 'Attach a JPG, PNG or WebP image' });
     image = Buffer.from(m[1], 'base64');
   }
-  if (!message && !image) return res.status(400).json({ error: 'Enter a message' });
+  if (!body && !image) return res.status(400).json({ error: 'Enter a message' });
+  const message = await withRegards(body, req.user, signAs);
 
   try {
     if (target === 'group') {
